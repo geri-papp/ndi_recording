@@ -43,7 +43,7 @@ logger = create_logger()
 
 
 class NDIReceiver:
-    def __init__(self, src, idx: int, path, codec="h264_nvenc", fps: int = 30) -> None:
+    def __init__(self, src, idx: int, path, codec="h264_nvenc", fps: int = 50) -> None:
         self.idx = idx
         self.codec = codec
         self.fps = fps
@@ -60,6 +60,8 @@ class NDIReceiver:
         if receiver is None:
             raise RuntimeError("Failed to create NDI receiver")
         ndi.recv_connect(receiver, src)
+
+        print(ndi.recv_get_metadata(receiver))
 
         return receiver
 
@@ -89,6 +91,16 @@ class NDIReceiver:
                 "pipe:",
                 "-c:v",
                 self.codec,
+                "-b:v",
+                "30000k",
+                "-preset",
+                "slow",
+                "-profile:v",
+                "high",
+                "-hwaccel",
+                "cuda",
+                "-hwaccel_output_format",
+                "cuda",
                 os.path.join(self.path, f"cam{self.idx}.mp4"),
             ],
             stdin=subprocess.PIPE,
@@ -105,7 +117,7 @@ class NDIReceiver:
         self.ffmpeg_process.wait()
 
 
-def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 30):
+def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 50):
 
     receiver = NDIReceiver(src, idx, path, codec, fps)
 
@@ -166,9 +178,11 @@ def main(start_time: datetime, end_time: datetime) -> int:
         logger.error("Failed to create NDI find instance.")
         return 1
 
-    logger.info("Looking for sources ...")
-    ndi.find_wait_for_sources(ndi_find, 5000)
-    sources = ndi.find_get_current_sources(ndi_find)
+    sources = []
+    while len(sources) < 2:
+        logger.info("Looking for sources ...")
+        ndi.find_wait_for_sources(ndi_find, 5000)
+        sources = ndi.find_get_current_sources(ndi_find)
 
     processes = []
     stop_event = Event()
@@ -223,8 +237,8 @@ def parse_arguments(args) -> Tuple[datetime]:
             end_time = datetime.strptime(f"{now.year}.{now.month}.{now.day}_{h}:{m}", "%Y.%m.%d_%H:%M")
         else:
             end_time = datetime.strptime(args.start_time, "%Y.%m.%d_%H:%M")
-    elif args.time:
-        duration = datetime.strptime(args.time, "%H:%M").time()
+    elif args.duration:
+        duration = datetime.strptime(args.duration, "%H:%M").time()
         end_time = start_time + timedelta(hours=duration.hour, minutes=duration.minute)
     else:
         duration = datetime.strptime("01:45", "%H:%M").time()
@@ -238,7 +252,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--start_time", type=str, help="Start time in HH:MM format. e.g. (18:00)", required=False)
     parser.add_argument("--end_time", type=str, help="End time in HH:MM format. e.g. (18:00)", required=False)
-    parser.add_argument("--time", type=str, help="Duration in HH:MM format. e.g. (18:00)", required=False)
+    parser.add_argument("--duration", type=str, help="Duration in HH:MM format. e.g. (18:00)", required=False)
 
     args = parse_arguments(parser.parse_args())
 

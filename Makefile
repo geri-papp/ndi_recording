@@ -18,10 +18,11 @@ build:
 
 # Run docker container
 run:
-	sudo docker run --privileged --gpus all -it --rm --network host \
+	sudo docker run -it --rm \
+	--gpus all \
+	--runtime=nvidia \
+	--network host \
 	-v /var/run/dbus:/var/run/dbus \
-	-v /usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu \
-    -v /usr/lib64:/usr/lib64 \
 	-v /run/avahi-daemon/socket:/run/avahi-daemon/socket \
 	-v /home/geri/work/datasets/test/:/app/output/ \
 	ndi_record

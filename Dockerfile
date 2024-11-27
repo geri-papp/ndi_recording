@@ -3,7 +3,7 @@ FROM nvidia/cuda:12.6.2-devel-ubuntu22.04
 ARG DEBIAN_FRONTEND=noninteractive
 ARG FFMPEG_VERSION=4.1.11
 
-# ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu
+ENV NVIDIA_DRIVER_CAPABILITIES=all
 
 # Install runtime dependencies
 RUN apt-get update -qq --fix-missing && \
@@ -11,13 +11,10 @@ RUN apt-get update -qq --fix-missing && \
         git \
         yasm \
         wget \
-        cmake \
         avahi-daemon \
         libavahi-client3 \
         dbus \
-        libnvidia-encode-560 \
         libblas-dev \
-        libblas3 \
         libnuma1 \
         libnuma-dev \
         libx264-dev \
@@ -73,7 +70,7 @@ RUN python3 -m venv .venv && \
     ./.venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # Final cleanup
-RUN apt-get remove -y git wget build-essential cmake yasm && \
+RUN apt-get remove -y git wget yasm && \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /tmp/* /root/.cache
