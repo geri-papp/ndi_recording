@@ -94,7 +94,7 @@ class NDIReceiver:
                 "-b:v",
                 "30000k",
                 "-preset",
-                "slow",
+                "fast",
                 "-profile:v",
                 "high",
                 "-hwaccel",
