@@ -1,15 +1,15 @@
-import os
-import NDIlib as ndi
-import subprocess
-import logging
-import numpy as np
-from multiprocessing import Process, Event
 import argparse
-from typing import Tuple
-from tqdm import tqdm
-
+import logging
+import os
+import subprocess
 import time
 from datetime import datetime, timedelta
+from multiprocessing import Event, Process
+from typing import Tuple
+
+import NDIlib as ndi
+import numpy as np
+from tqdm import tqdm
 
 out_path = f"{os.getcwd()}/output/{datetime.now().strftime('%Y%m%d_%H%M')}"
 os.makedirs(out_path, exist_ok=True)
@@ -248,7 +248,10 @@ def parse_arguments(args) -> Tuple[datetime]:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="NDI Stream Recorder", description="Schedule a script to run based on time.")
+    parser = argparse.ArgumentParser(
+        prog="NDI Stream Recorder",
+        description="Schedule a script to run based on time.",
+    )
 
     parser.add_argument("--start_time", type=str, help="Start time in HH:MM format. e.g. (18:00)", required=False)
     parser.add_argument("--end_time", type=str, help="End time in HH:MM format. e.g. (18:00)", required=False)

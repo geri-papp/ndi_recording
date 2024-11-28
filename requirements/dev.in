@@ -1,0 +1,7 @@
+-r prod.in
+
+black
+isort
+flake8
+pre-commit
+pytest

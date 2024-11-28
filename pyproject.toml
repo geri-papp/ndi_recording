@@ -1,0 +1,23 @@
+[tool.flake8]
+max-line-length = 120
+exclude = [".git", "__pycache__", "venv", ".venv"]
+max-complexity = 10
+ignore = ["E203", "W503"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+skip-string-normalization = true
+include = "\\.pyi?$"
+exclude = '''/(
+    \.git
+  | \.venv
+  | venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
