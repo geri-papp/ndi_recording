@@ -1,5 +1,4 @@
 import argparse
-import logging
 import os
 import subprocess
 import time
@@ -7,141 +6,128 @@ from datetime import datetime, timedelta
 from multiprocessing import Event, Process
 from typing import Tuple
 
-import NDIlib as ndi
-import numpy as np
+import onnxruntime
+import torch
+import torchvision.transforms as T
 from tqdm import tqdm
 
-out_path = f"{os.getcwd()}/output/{datetime.now().strftime('%Y%m%d_%H%M')}"
-os.makedirs(out_path, exist_ok=True)
+from src.camera_system import CameraSystem
+from src.logger import LOG_DIR, logger
+from src.utils import Camera, CameraOrientation
 
 
-def create_logger():
-    l = logging.getLogger("ndi_logger")
-    l.setLevel(logging.DEBUG)
+def rtsp_process(
+    camera_system: CameraSystem,
+    camera: Camera,
+    stop_event: Event,
+    frame_size: Tuple[int],
+    onnx_file: str,
+    fps: int = 15,
+):
+    onnx_session = onnxruntime.InferenceSession(onnx_file)
+    logger.info(f"ONNX Model Device: {onnxruntime.get_device()}")
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-
-    file_handler = logging.FileHandler(f"{out_path}/run.log", mode="w")
-    file_handler.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter(
-        fmt="{asctime} - [{levelname}]: {message}",
-        style="{",
+    transform = T.Compose(
+        [
+            T.Resize((640, 640)),
+            T.ToTensor(),
+        ]
     )
 
-    console_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
-
-    l.addHandler(console_handler)
-    l.addHandler(file_handler)
-
-    return l
-
-
-logger = create_logger()
-
-
-class NDIReceiver:
-    def __init__(self, src, idx: int, path, codec="h264_nvenc", fps: int = 50) -> None:
-        self.idx = idx
-        self.codec = codec
-        self.fps = fps
-        self.path = path
-
-        self.receiver = self.create_receiver(src)
-        self.ffmpeg_process = self.start_ffmpeg_process()
-
-    def create_receiver(self, src):
-
-        ndi_recv_create = ndi.RecvCreateV3()
-        ndi_recv_create.color_format = ndi.RECV_COLOR_FORMAT_BGRX_BGRA
-        receiver = ndi.recv_create_v3(ndi_recv_create)
-        if receiver is None:
-            raise RuntimeError("Failed to create NDI receiver")
-        ndi.recv_connect(receiver, src)
-
-        print(ndi.recv_get_metadata(receiver))
-
-        return receiver
-
-    def get_frame(self):
-
-        t, v, _, _ = ndi.recv_capture_v3(self.receiver, 1000)
-        frame = None
-        if t == ndi.FRAME_TYPE_VIDEO:
-            frame = np.copy(v.data[:, :, :3])
-            ndi.recv_free_video_v2(self.receiver, v)
-
-        return frame, t
-
-    def start_ffmpeg_process(self):
-        return subprocess.Popen(
-            [
-                "ffmpeg",
-                "-f",
-                "rawvideo",
-                "-pix_fmt",
-                "yuv420p",
-                "-s",
-                "1920x1080",
-                "-r",
-                str(self.fps),
-                "-i",
-                "pipe:",
-                "-c:v",
-                self.codec,
-                "-b:v",
-                "30000k",
-                "-preset",
-                "fast",
-                "-profile:v",
-                "high",
-                "-hwaccel",
-                "cuda",
-                "-hwaccel_output_format",
-                "cuda",
-                os.path.join(self.path, f"cam{self.idx}.mp4"),
-            ],
-            stdin=subprocess.PIPE,
-        )
-
-    def stop(self) -> None:
-        if self.ffmpeg_process.stdin:
-            try:
-                self.ffmpeg_process.stdin.flush()
-                self.ffmpeg_process.stdin.close()
-            except BrokenPipeError as e:
-                logger.error(f"Broken pipe error while closing stdin: {e}")
-
-        self.ffmpeg_process.wait()
-
-
-def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 50):
-
-    receiver = NDIReceiver(src, idx, path, codec, fps)
-
-    logger.info(f"NDI Receiver {idx} created.")
+    orig_size = torch.tensor([frame_size[0], frame_size[1]])[None]
 
     try:
         while not stop_event.is_set():
-            frame, t = receiver.get_frame()
+            frame = camera_system.get_frame(camera).get_frame()
+            if frame is not None:
+                img = transform(frame)[None]
+
+                labels, boxes, scores = onnx_session.run(
+                    output_names=None,
+                    input_feed={
+                        'images': img.data.numpy(),
+                        "orig_target_sizes": orig_size.data.numpy(),
+                    },
+                )
+
+                bucket_width = 716
+                buckets = {1: [], 2: [], 3: []}
+
+                bboxes_player = boxes[(labels == 2) & (scores > 0.5)]
+                centers_x = (bboxes_player[:, 0] + bboxes_player[:, 2]) / 2 - 350
+
+                for i, center_x in enumerate(centers_x):
+                    if center_x < bucket_width:  # Left region
+                        buckets[1].append(bboxes_player[i])
+                    elif center_x < 2 * bucket_width:  # Middle region
+                        buckets[2].append(bboxes_player[i])
+                    else:  # Right region
+                        buckets[3].append(bboxes_player[i])
+
+                most_populated_bucket = max(buckets, key=lambda k: len(buckets[k]))
+
+                camera_system.change_orientation(CameraOrientation(most_populated_bucket))
+
+            else:
+                logger.warning(f"No panorama frame captured.")
+    except KeyboardInterrupt:
+        camera_system.cameras[camera].stop()
+
+    logger.info(f"RTSP Receiver Process stopped.")
+
+
+def ndi_process(camera_system: CameraSystem, camera: Camera, path: str, stop_event: Event, codec: str = "h264_nvenc"):
+
+    ffmpeg_process = subprocess.Popen(
+        [
+            "ffmpeg",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "yuv420p",
+            "-s",
+            "1920x1080",
+            "-r",
+            str(camera_system.cameras[camera].fps),
+            "-i",
+            "pipe:",
+            "-c:v",
+            codec,
+            "-b:v",
+            "30000k",
+            "-preset",
+            "fast",
+            "-profile:v",
+            "high",
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
+            os.path.join(path, f"cam{camera.value}.mp4"),
+        ],
+        stdin=subprocess.PIPE,
+    )
+
+    try:
+        while not stop_event.is_set():
+            frame, t = camera_system.get_frame(camera)
             if frame is not None:
                 try:
-                    receiver.ffmpeg_process.stdin.write(frame.tobytes())
-                    receiver.ffmpeg_process.stdin.flush()
+                    ffmpeg_process.stdin.write(frame.tobytes())
+                    ffmpeg_process.stdin.flush()
                 except BrokenPipeError as e:
                     logger.error(f"Broken pipe error while writing frame: {e}")
                     break
                 except Exception as e:
-                    logger.error(f"Error in NDI Receiver Process {idx}: {e}")
+                    logger.error(f"Error in NDI Receiver Process {camera}: {e}")
                     break
             else:
                 logger.warning(f"No video frame captured. Frame type: {t}")
     except KeyboardInterrupt:
-        receiver.stop()
+        ffmpeg_process.stdin.flush()
+        ffmpeg_process.stdin.close()
 
-    logger.info(f"NDI Receiver Process {receiver.idx} stopped.")
+    logger.info(f"NDI Receiver Process {camera} stopped.")
 
 
 def schedule(start_time: datetime, end_time: datetime) -> None:
@@ -168,30 +154,17 @@ def schedule(start_time: datetime, end_time: datetime) -> None:
 def main(start_time: datetime, end_time: datetime) -> int:
 
     schedule(start_time, end_time)
-
-    if not ndi.initialize():
-        logger.error("Failed to initialize NDI.")
-        return 1
-
-    ndi_find = ndi.find_create_v2()
-    if ndi_find is None:
-        logger.error("Failed to create NDI find instance.")
-        return 1
-
-    sources = []
-    while len(sources) < 2:
-        logger.info("Looking for sources ...")
-        ndi.find_wait_for_sources(ndi_find, 5000)
-        sources = ndi.find_get_current_sources(ndi_find)
+    camera_system = CameraSystem()
 
     processes = []
     stop_event = Event()
-    for idx, source in enumerate(sources):
-        p = Process(target=ndi_receiver_process, args=(source, idx, out_path, stop_event))
+    for camera in camera_system.cameras:
+        if camera != Camera.PANO:
+            p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
+        else:
+            p = Process(target=rtsp_process, args=(camera_system, camera, LOG_DIR, stop_event))
         processes.append(p)
         p.start()
-
-    ndi.find_destroy(ndi_find)
 
     try:
         delta_time = int((end_time - start_time).total_seconds())
