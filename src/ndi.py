@@ -5,14 +5,17 @@ import NDIlib as ndi
 import numpy as np
 
 from src.logger import logger
-from utils import CameraOrientation, CameraPosition
+from src.utils import CameraOrientation, Camera
 
 
 class CameraNDI:
-    def __init__(self, src, pos: CameraPosition, fps: int = 50) -> None:
+    def __init__(self, src, camera: Camera, fps: int = 50) -> None:
         self.fps = fps
 
-        self.__position = pos
+        self.__camera = camera
+        self.__ip_addrs = src.url_address.split(':')[0]
+
+        self.__orientation = None
         self.orientation = CameraOrientation.CENTER
 
         self.receiver = self.__create_receiver(src)
@@ -39,8 +42,8 @@ class CameraNDI:
         return frame, t
 
     @property
-    def position(self):
-        return self.__position
+    def camera(self):
+        return self.__camera
 
     @property
     def orientation(self):
@@ -55,7 +58,7 @@ class CameraNDI:
                 rf'szCmd={{'
                 rf'"SysCtrl":{{'
                 rf'"PtzCtrl":{{'
-                rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{self.orientation.value if self.position == CameraPosition.MAIN else 2 - self.orientation.value}'
+                rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{self.orientation.value if self.camera == Camera.PTZ_MAIN else 2 - self.orientation.value}'
                 rf'}}'
                 rf'}}'
                 rf'}}'

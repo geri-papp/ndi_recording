@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timedelta
 from multiprocessing import Event, Process
 from typing import Tuple
+from PIL import Image
 
 import onnxruntime
 import torch
@@ -34,13 +35,13 @@ def rtsp_process(
         ]
     )
 
-    orig_size = torch.tensor([frame_size[0], frame_size[1]])[None]
+    orig_size = torch.tensor([frame_size[0], frame_size[1]])[None].to('cuda')
 
     try:
         while not stop_event.is_set():
             frame = camera_system.get_frame(camera).get_frame()
             if frame is not None:
-                img = transform(frame)[None]
+                img = transform(Image.fromarray(frame))[None].to('cuda')
 
                 labels, boxes, scores = onnx_session.run(
                     output_names=None,

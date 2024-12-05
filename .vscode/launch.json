@@ -14,7 +14,7 @@
                 // "2024.11.21_10:35",
                 // "--end_time",
                 // "11:00",
-                "--time",
+                "--duration",
                 "01:45"
             ],
             "console": "integratedTerminal"

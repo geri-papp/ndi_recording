@@ -1,5 +1,3 @@
-from multiprocessing import Event
-
 import cv2
 
 from src.logger import logger
@@ -10,7 +8,7 @@ class CameraRTSP:
 
         self.video_cap = cv2.VideoCapture(url)
         if not self.video_cap.isOpened():
-            logger.Warning("Cannot open RTSP stream.")
+            logger.warning("Cannot open RTSP stream.")
 
     def get_frame(self):
         ret, frame = self.video_cap.read()
