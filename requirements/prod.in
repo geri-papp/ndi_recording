@@ -2,5 +2,5 @@ numpy
 ndi-python
 tqdm
 onnxruntime-gpu
-opencv-python
+opencv-python-headless
 pillow

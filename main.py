@@ -19,32 +19,32 @@ from src.camera_system import CameraSystem
 from src.logger import LOG_DIR, logger
 from src.utils import Camera, CameraOrientation
 
-class2color = {1: (255, 0, 0), 2: (0, 255, 0), 3: (255, 255, 0)}
-class2str = {1: 'Goalkeeper', 2: 'Player', 3: 'Referee'}
+# class2color = {1: (255, 0, 0), 2: (0, 255, 0), 3: (255, 255, 0)}
+# class2str = {1: 'Goalkeeper', 2: 'Player', 3: 'Referee'}
 
 
-def draw(image, labels, boxes, scores, bucket_id, bucket_width, thrh=0.5):
-    draw = ImageDraw.Draw(image)
+# def draw(image, labels, boxes, scores, bucket_id, bucket_width, thrh=0.5):
+#     draw = ImageDraw.Draw(image)
 
-    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw_overlay = ImageDraw.Draw(overlay)
+#     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+#     draw_overlay = ImageDraw.Draw(overlay)
 
-    scr = scores
-    lab = labels[scr > thrh]
-    box = boxes[scr > thrh]
+#     scr = scores
+#     lab = labels[scr > thrh]
+#     box = boxes[scr > thrh]
 
-    left = bucket_id * bucket_width
-    right = (bucket_id + 1) * bucket_width
-    draw_overlay.rectangle([left, 0, right, image.height], fill=(0, 128, 255, 50))
+#     left = bucket_id * bucket_width
+#     right = (bucket_id + 1) * bucket_width
+#     draw_overlay.rectangle([left, 0, right, image.height], fill=(0, 128, 255, 50))
 
-    for box, label, score in zip(boxes, labels, scores):
-        if score > thrh:
-            draw.rectangle(box.tolist(), outline=class2color[label], width=2)
-            draw.text((box[0], box[1]), text=class2str[label], fill="blue")
+#     for box, label, score in zip(boxes, labels, scores):
+#         if score > thrh:
+#             draw.rectangle(box.tolist(), outline=class2color[label], width=2)
+#             draw.text((box[0], box[1]), text=class2str[label], fill="blue")
 
-    blended = Image.alpha_composite(image.convert("RGBA"), overlay)
-    cv2.imshow("Image", np.array(blended))
-    cv2.waitKey(1)
+#     blended = Image.alpha_composite(image.convert("RGBA"), overlay)
+#     cv2.imshow("Image", np.array(blended))
+#     cv2.waitKey(1)
 
 
 def process_buckets(boxes, labels, scores, bucket_width):
@@ -211,14 +211,14 @@ def main(start_time: datetime, end_time: datetime) -> int:
 
     processes = []
     stop_event = Event()
-    rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
-    # for camera in camera_system.cameras:
-    #     if camera != Camera.PANO:
-    #         p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
-    #     else:
-    #         p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
-    #     processes.append(p)
-    #     p.start()
+    # rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
+    for camera in camera_system.cameras:
+        if camera != Camera.PANO:
+            p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
+        else:
+            p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
+        processes.append(p)
+        p.start()
 
     try:
         delta_time = int((end_time - start_time).total_seconds())
