@@ -10,8 +10,9 @@ from typing import Tuple
 import cv2
 import numpy as np
 import onnxruntime
-import torch
 import torchvision.transforms as T
+import time
+
 from PIL import Image, ImageDraw
 from tqdm import tqdm
 
@@ -85,7 +86,9 @@ def rtsp_process(
     fps: int = 15,
 ):
 
-    orig_size = torch.tensor([frame_size[0], frame_size[1]])[None]
+    sleep_time = 1 / fps
+
+    orig_size = np.array([frame_size[0], frame_size[1]])
     bucket_width = frame_size[0] // 3
 
     onnx_session = onnxruntime.InferenceSession(onnx_file, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
@@ -123,15 +126,17 @@ def rtsp_process(
 
             camera_system.change_orientation(CameraOrientation(mode))
 
-            draw(
-                images=Image.fromarray(frame),
-                labels=labels,
-                boxes=boxes,
-                scores=scores,
-                bucket_id=most_populated_bucket,
-                bucket_width=bucket_width,
-                thrh=0.5,
-            )
+            # draw(
+            #     images=Image.fromarray(frame),
+            #     labels=labels,
+            #     boxes=boxes,
+            #     scores=scores,
+            #     bucket_id=most_populated_bucket,
+            #     bucket_width=bucket_width,
+            #     thrh=0.5,
+            # )
+
+            time.sleep(sleep_time)
 
     except KeyboardInterrupt:
         camera_system.cameras[camera].stop()
@@ -221,14 +226,14 @@ def main(start_time: datetime, end_time: datetime) -> int:
 
     processes = []
     stop_event = Event()
-    rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
-    # for camera in camera_system.cameras:
-    #     if camera != Camera.PANO:
-    #         p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
-    #     else:
-    #         p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
-    #     processes.append(p)
-    #     p.start()
+    # rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
+    for camera in camera_system.cameras:
+        if camera != Camera.PANO:
+            p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
+        else:
+            p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
+        processes.append(p)
+        p.start()
 
     try:
         delta_time = int((end_time - start_time).total_seconds())
