@@ -3,5 +3,4 @@ ndi-python
 tqdm
 onnxruntime-gpu
 opencv-python
-torchvision
 pillow

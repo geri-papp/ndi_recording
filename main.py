@@ -10,7 +10,6 @@ from typing import Tuple
 import cv2
 import numpy as np
 import onnxruntime
-import torchvision.transforms as T
 import time
 
 from PIL import Image, ImageDraw
@@ -53,11 +52,11 @@ def process_buckets(boxes, labels, scores, bucket_width):
     bboxes_player = boxes[(labels == 2) & (scores > 0.5)]
     centers_x = (bboxes_player[:, 0] + bboxes_player[:, 2]) / 2
 
-    for i, center_x in enumerate(centers_x):
+    for center_x in centers_x:
         bucket_idx = center_x // bucket_width
         buckets[bucket_idx] += 1
 
-    return max(buckets, key=lambda k: len(buckets[k]))
+    return max(buckets, key=lambda k: buckets[k])
 
 
 def update_frequency(window, freq_counter, bucket, max_window_size=50):
@@ -88,18 +87,11 @@ def rtsp_process(
 
     sleep_time = 1 / fps
 
-    orig_size = np.array([frame_size[0], frame_size[1]])
+    orig_size = np.array([[frame_size[0], frame_size[1]]])
     bucket_width = frame_size[0] // 3
 
     onnx_session = onnxruntime.InferenceSession(onnx_file, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
     logger.info(f"ONNX Model Device: {onnxruntime.get_device()}")
-
-    transform = T.Compose(
-        [
-            T.Resize((640, 640)),
-            T.ToTensor(),
-        ]
-    )
 
     window = deque()
     freq_counter = Counter()
@@ -112,12 +104,14 @@ def rtsp_process(
                 logger.warning(f"No panorama frame captured.")
                 continue
 
-            img = transform(Image.fromarray(frame))[None]
+            img = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
+            img = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0)
+
             labels, boxes, scores = onnx_session.run(
                 output_names=None,
                 input_feed={
-                    'images': img.data.numpy(),
-                    "orig_target_sizes": orig_size.data.numpy(),
+                    'images': img,
+                    "orig_target_sizes": orig_size,
                 },
             )
 
@@ -125,16 +119,7 @@ def rtsp_process(
             mode = update_frequency(window, freq_counter, most_populated_bucket)
 
             camera_system.change_orientation(CameraOrientation(mode))
-
-            # draw(
-            #     images=Image.fromarray(frame),
-            #     labels=labels,
-            #     boxes=boxes,
-            #     scores=scores,
-            #     bucket_id=most_populated_bucket,
-            #     bucket_width=bucket_width,
-            #     thrh=0.5,
-            # )
+            # draw(Image.fromarray(frame), labels, boxes, scores, mode, bucket_width, thrh=0.5)
 
             time.sleep(sleep_time)
 
@@ -226,14 +211,14 @@ def main(start_time: datetime, end_time: datetime) -> int:
 
     processes = []
     stop_event = Event()
-    # rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
-    for camera in camera_system.cameras:
-        if camera != Camera.PANO:
-            p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
-        else:
-            p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
-        processes.append(p)
-        p.start()
+    rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
+    # for camera in camera_system.cameras:
+    #     if camera != Camera.PANO:
+    #         p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
+    #     else:
+    #         p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
+    #     processes.append(p)
+    #     p.start()
 
     try:
         delta_time = int((end_time - start_time).total_seconds())
