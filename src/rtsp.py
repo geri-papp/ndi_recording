@@ -13,7 +13,7 @@ class CameraRTSP:
     def get_frame(self):
         ret, frame = self.video_cap.read()
 
-        return frame[420:1150, 1190:3660] if ret else None
+        return frame[420:1150, 1190:3390] if ret else None
 
     def stop(self) -> None:
         self.video_cap.release()

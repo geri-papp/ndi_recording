@@ -2,19 +2,78 @@ import argparse
 import os
 import subprocess
 import time
+from collections import Counter, deque
 from datetime import datetime, timedelta
 from multiprocessing import Event, Process
 from typing import Tuple
-from PIL import Image
 
+import cv2
+import numpy as np
 import onnxruntime
 import torch
 import torchvision.transforms as T
+from PIL import Image, ImageDraw
 from tqdm import tqdm
 
 from src.camera_system import CameraSystem
 from src.logger import LOG_DIR, logger
 from src.utils import Camera, CameraOrientation
+
+class2color = {1: (255, 0, 0), 2: (0, 255, 0), 3: (255, 255, 0)}
+class2str = {1: 'Goalkeeper', 2: 'Player', 3: 'Referee'}
+
+
+def draw(image, labels, boxes, scores, bucket_id, bucket_width, thrh=0.5):
+    draw = ImageDraw.Draw(image)
+
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    draw_overlay = ImageDraw.Draw(overlay)
+
+    scr = scores
+    lab = labels[scr > thrh]
+    box = boxes[scr > thrh]
+
+    left = bucket_id * bucket_width
+    right = (bucket_id + 1) * bucket_width
+    draw_overlay.rectangle([left, 0, right, image.height], fill=(0, 128, 255, 50))
+
+    for box, label, score in zip(boxes, labels, scores):
+        if score > thrh:
+            draw.rectangle(box.tolist(), outline=class2color[label], width=2)
+            draw.text((box[0], box[1]), text=class2str[label], fill="blue")
+
+    blended = Image.alpha_composite(image.convert("RGBA"), overlay)
+    cv2.imshow("Image", np.array(blended))
+    cv2.waitKey(1)
+
+
+def process_buckets(boxes, labels, scores, bucket_width):
+    buckets = {0: 0, 1: 0, 2: 0}
+    bboxes_player = boxes[(labels == 2) & (scores > 0.5)]
+    centers_x = (bboxes_player[:, 0] + bboxes_player[:, 2]) / 2
+
+    for i, center_x in enumerate(centers_x):
+        bucket_idx = center_x // bucket_width
+        buckets[bucket_idx] += 1
+
+    return max(buckets, key=lambda k: len(buckets[k]))
+
+
+def update_frequency(window, freq_counter, bucket, max_window_size=50):
+    """
+    Update the sliding window and frequency counter to track the most frequent bucket.
+    """
+    window.append(bucket)
+    freq_counter[bucket] += 1
+
+    if len(window) > max_window_size:
+        oldest = window.popleft()
+        freq_counter[oldest] -= 1
+        if freq_counter[oldest] == 0:
+            del freq_counter[oldest]
+
+    # Return the most common bucket
+    return freq_counter.most_common(1)[0][0]
 
 
 def rtsp_process(
@@ -25,7 +84,11 @@ def rtsp_process(
     onnx_file: str,
     fps: int = 15,
 ):
-    onnx_session = onnxruntime.InferenceSession(onnx_file)
+
+    orig_size = torch.tensor([frame_size[0], frame_size[1]])[None]
+    bucket_width = frame_size[0] // 3
+
+    onnx_session = onnxruntime.InferenceSession(onnx_file, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
     logger.info(f"ONNX Model Device: {onnxruntime.get_device()}")
 
     transform = T.Compose(
@@ -35,42 +98,41 @@ def rtsp_process(
         ]
     )
 
-    orig_size = torch.tensor([frame_size[0], frame_size[1]])[None].to('cuda')
+    window = deque()
+    freq_counter = Counter()
 
     try:
         while not stop_event.is_set():
-            frame = camera_system.get_frame(camera).get_frame()
-            if frame is not None:
-                img = transform(Image.fromarray(frame))[None].to('cuda')
+            frame = camera_system.get_frame(camera)
 
-                labels, boxes, scores = onnx_session.run(
-                    output_names=None,
-                    input_feed={
-                        'images': img.data.numpy(),
-                        "orig_target_sizes": orig_size.data.numpy(),
-                    },
-                )
-
-                bucket_width = 716
-                buckets = {1: [], 2: [], 3: []}
-
-                bboxes_player = boxes[(labels == 2) & (scores > 0.5)]
-                centers_x = (bboxes_player[:, 0] + bboxes_player[:, 2]) / 2 - 350
-
-                for i, center_x in enumerate(centers_x):
-                    if center_x < bucket_width:  # Left region
-                        buckets[1].append(bboxes_player[i])
-                    elif center_x < 2 * bucket_width:  # Middle region
-                        buckets[2].append(bboxes_player[i])
-                    else:  # Right region
-                        buckets[3].append(bboxes_player[i])
-
-                most_populated_bucket = max(buckets, key=lambda k: len(buckets[k]))
-
-                camera_system.change_orientation(CameraOrientation(most_populated_bucket))
-
-            else:
+            if frame is None:
                 logger.warning(f"No panorama frame captured.")
+                continue
+
+            img = transform(Image.fromarray(frame))[None]
+            labels, boxes, scores = onnx_session.run(
+                output_names=None,
+                input_feed={
+                    'images': img.data.numpy(),
+                    "orig_target_sizes": orig_size.data.numpy(),
+                },
+            )
+
+            most_populated_bucket = process_buckets(boxes, labels, scores, bucket_width)
+            mode = update_frequency(window, freq_counter, most_populated_bucket)
+
+            camera_system.change_orientation(CameraOrientation(mode))
+
+            draw(
+                images=Image.fromarray(frame),
+                labels=labels,
+                boxes=boxes,
+                scores=scores,
+                bucket_id=most_populated_bucket,
+                bucket_width=bucket_width,
+                thrh=0.5,
+            )
+
     except KeyboardInterrupt:
         camera_system.cameras[camera].stop()
 
@@ -159,13 +221,14 @@ def main(start_time: datetime, end_time: datetime) -> int:
 
     processes = []
     stop_event = Event()
-    for camera in camera_system.cameras:
-        if camera != Camera.PANO:
-            p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
-        else:
-            p = Process(target=rtsp_process, args=(camera_system, camera, LOG_DIR, stop_event))
-        processes.append(p)
-        p.start()
+    rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
+    # for camera in camera_system.cameras:
+    #     if camera != Camera.PANO:
+    #         p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
+    #     else:
+    #         p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
+    #     processes.append(p)
+    #     p.start()
 
     try:
         delta_time = int((end_time - start_time).total_seconds())

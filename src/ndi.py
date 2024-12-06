@@ -5,7 +5,7 @@ import NDIlib as ndi
 import numpy as np
 
 from src.logger import logger
-from src.utils import CameraOrientation, Camera
+from src.utils import Camera, CameraOrientation
 
 
 class CameraNDI:
@@ -58,7 +58,7 @@ class CameraNDI:
                 rf'szCmd={{'
                 rf'"SysCtrl":{{'
                 rf'"PtzCtrl":{{'
-                rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{self.orientation.value if self.camera == Camera.PTZ_MAIN else 2 - self.orientation.value}'
+                rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{self.orientation.value}'
                 rf'}}'
                 rf'}}'
                 rf'}}'
