@@ -12,39 +12,14 @@ import numpy as np
 import onnxruntime
 import time
 
-from PIL import Image, ImageDraw
+from typing import List
 from tqdm import tqdm
 
-from src.camera_system import CameraSystem
 from src.logger import LOG_DIR, logger
-from src.utils import Camera, CameraOrientation
-
-# class2color = {1: (255, 0, 0), 2: (0, 255, 0), 3: (255, 255, 0)}
-# class2str = {1: 'Goalkeeper', 2: 'Player', 3: 'Referee'}
-
-
-# def draw(image, labels, boxes, scores, bucket_id, bucket_width, thrh=0.5):
-#     draw = ImageDraw.Draw(image)
-
-#     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-#     draw_overlay = ImageDraw.Draw(overlay)
-
-#     scr = scores
-#     lab = labels[scr > thrh]
-#     box = boxes[scr > thrh]
-
-#     left = bucket_id * bucket_width
-#     right = (bucket_id + 1) * bucket_width
-#     draw_overlay.rectangle([left, 0, right, image.height], fill=(0, 128, 255, 50))
-
-#     for box, label, score in zip(boxes, labels, scores):
-#         if score > thrh:
-#             draw.rectangle(box.tolist(), outline=class2color[label], width=2)
-#             draw.text((box[0], box[1]), text=class2str[label], fill="blue")
-
-#     blended = Image.alpha_composite(image.convert("RGBA"), overlay)
-#     cv2.imshow("Image", np.array(blended))
-#     cv2.waitKey(1)
+import src.cameras.ptz as ptz
+from src.cameras.ptz import CameraPTZ
+from src.cameras.pano import CameraPano
+from src.utils import CameraOrientation
 
 
 def process_buckets(boxes, labels, scores, bucket_width):
@@ -76,19 +51,13 @@ def update_frequency(window, freq_counter, bucket, max_window_size=50):
     return freq_counter.most_common(1)[0][0]
 
 
-def rtsp_process(
-    camera_system: CameraSystem,
-    camera: Camera,
-    stop_event: Event,
-    frame_size: Tuple[int],
-    onnx_file: str,
-    fps: int = 15,
+def pano_process(
+    camera: CameraPano, ptz_cameras: List[CameraPTZ], onnx_file: str, stop_event: Event, start_event: Event
 ):
+    """ """
 
-    sleep_time = 1 / fps
-
-    orig_size = np.array([[frame_size[0], frame_size[1]]])
-    bucket_width = frame_size[0] // 3
+    sleep_time = 1 / camera.fps
+    bucket_width = camera.frame_size[1] // 3
 
     onnx_session = onnxruntime.InferenceSession(onnx_file, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
     logger.info(f"ONNX Model Device: {onnxruntime.get_device()}")
@@ -96,9 +65,10 @@ def rtsp_process(
     window = deque()
     freq_counter = Counter()
 
+    start_event.set()
     try:
         while not stop_event.is_set():
-            frame = camera_system.get_frame(camera)
+            frame = camera.get_frame()
 
             if frame is None:
                 logger.warning(f"No panorama frame captured.")
@@ -111,25 +81,26 @@ def rtsp_process(
                 output_names=None,
                 input_feed={
                     'images': img,
-                    "orig_target_sizes": orig_size,
+                    "orig_target_sizes": camera.frame_size[::-1],
                 },
             )
 
             most_populated_bucket = process_buckets(boxes, labels, scores, bucket_width)
             mode = update_frequency(window, freq_counter, most_populated_bucket)
 
-            camera_system.change_orientation(CameraOrientation(mode))
+            for ptz_cam in ptz_cameras:
+                ptz_cam.orientation = CameraOrientation(mode)
             # draw(Image.fromarray(frame), labels, boxes, scores, mode, bucket_width, thrh=0.5)
 
             time.sleep(sleep_time)
 
     except KeyboardInterrupt:
-        camera_system.cameras[camera].stop()
+        camera.stop()
 
     logger.info(f"RTSP Receiver Process stopped.")
 
 
-def ndi_process(camera_system: CameraSystem, camera: Camera, path: str, stop_event: Event, codec: str = "h264_nvenc"):
+def ptz_process(camera: CameraPTZ, path: str, stop_event: Event, codec: str = "h264_nvenc"):
 
     ffmpeg_process = subprocess.Popen(
         [
@@ -141,7 +112,7 @@ def ndi_process(camera_system: CameraSystem, camera: Camera, path: str, stop_eve
             "-s",
             "1920x1080",
             "-r",
-            str(camera_system.cameras[camera].fps),
+            str(camera.fps),
             "-i",
             "pipe:",
             "-c:v",
@@ -156,14 +127,14 @@ def ndi_process(camera_system: CameraSystem, camera: Camera, path: str, stop_eve
             "cuda",
             "-hwaccel_output_format",
             "cuda",
-            os.path.join(path, f"cam{camera.value}.mp4"),
+            os.path.join(path, f"cam{camera.idx}.mp4"),
         ],
         stdin=subprocess.PIPE,
     )
 
     try:
         while not stop_event.is_set():
-            frame, t = camera_system.get_frame(camera)
+            frame, t = camera.get_frame(camera)
             if frame is not None:
                 try:
                     ffmpeg_process.stdin.write(frame.tobytes())
@@ -207,18 +178,32 @@ def schedule(start_time: datetime, end_time: datetime) -> None:
 def main(start_time: datetime, end_time: datetime) -> int:
 
     schedule(start_time, end_time)
-    camera_system = CameraSystem()
 
-    processes = []
+    start_event = Event()
     stop_event = Event()
-    # rtsp_process(camera_system, Camera.PANO, stop_event, (2200, 730), './rtdetrv2.onnx')
-    for camera in camera_system.cameras:
-        if camera != Camera.PANO:
-            p = Process(target=ndi_process, args=(camera_system, camera, LOG_DIR, stop_event))
-        else:
-            p = Process(target=rtsp_process, args=(camera_system, camera, stop_event, (1920, 1080), './rtdetrv2.onnx'))
+
+    ndi_sources, ndi_find = ptz.get_sources()
+    ptz_cameras = []
+    for ndi_source in ndi_sources:
+        camera = ptz.CameraPTZ(src=ndi_source, fps=50)
+        ptz_cameras.append(camera)
+
+    camera = CameraPano(
+        url="/media/geri/88438b12-8823-446e-b364-546efb5da056/datasets/wp_old/videos/tmp.mp4",
+        fps=15,
+        roi=(420, 1190, 1150, 3390),
+    )
+    proc_pano = Process(target=pano_process, args=(camera, ptz_cameras, './rtdetrv2.onnx', stop_event, start_event))
+    proc_pano.start()
+
+    start_event.wait()
+    processes = []
+    for camera in ptz_cameras:
+        p = Process(target=ptz_process, args=(camera, LOG_DIR, stop_event))
         processes.append(p)
         p.start()
+
+    ptz.find_destroy(ndi_find)
 
     try:
         delta_time = int((end_time - start_time).total_seconds())

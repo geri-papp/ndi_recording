@@ -29,10 +29,7 @@ build:
 
 # Run docker container
 run:
-	sudo docker run -it --rm \
-	--gpus all \
-	--runtime=nvidia \
-	--network host \
+	sudo docker run -it --rm --gpus all --runtime=nvidia --network host --privileged \
 	-v /var/run/dbus:/var/run/dbus \
 	-v /run/avahi-daemon/socket:/run/avahi-daemon/socket \
 	-v /home/geri/work/datasets/test/:/app/output/ \

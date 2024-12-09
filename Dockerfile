@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.6.2-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG FFMPEG_VERSION=4.1.11
@@ -10,6 +10,7 @@ RUN apt-get update -qq --fix-missing && \
     apt-get install -y --no-install-recommends \
         git \
         yasm \
+        curl \
         wget \
         avahi-daemon \
         libavahi-client3 \
@@ -64,6 +65,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 WORKDIR /app
 COPY main.py /app/
 COPY requirements/prod.txt /app/
+COPY src/ /app/src
 COPY rtdetrv2.onnx /app/
 
 # Install Python dependencies in a virtual environment
@@ -71,9 +73,9 @@ RUN python3 -m venv .venv && \
     ./.venv/bin/pip install --no-cache-dir -r prod.txt
 
 # Final cleanup
-RUN apt-get remove -y git wget yasm && \
-    apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /tmp/* /root/.cache
+# RUN apt-get remove -y git wget yasm && \
+#     apt-get autoremove -y && \
+#     apt-get clean && \
+#     rm -rf /tmp/* /root/.cache
 
 CMD ["/bin/bash", "-c", "source /app/.venv/bin/activate && exec bash"]

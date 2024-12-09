@@ -5,18 +5,22 @@ import NDIlib as ndi
 import numpy as np
 
 from src.logger import logger
-from src.utils import Camera, CameraOrientation
+from src.utils import CameraOrientation
 
 
-class CameraNDI:
-    def __init__(self, src, camera: Camera, fps: int = 50) -> None:
+class CameraPTZ:
+    instance_counter = 0
+
+    def __init__(self, src, fps: int) -> None:
         self.fps = fps
 
-        self.__camera = camera
         self.__ip_addrs = src.url_address.split(':')[0]
 
         self.__orientation = None
         self.orientation = CameraOrientation.CENTER
+
+        self.idx = CameraPTZ.instance_counter
+        CameraPTZ.instance_counter += 1
 
         self.receiver = self.__create_receiver(src)
 
@@ -40,10 +44,6 @@ class CameraNDI:
             ndi.recv_free_video_v2(self.receiver, v)
 
         return frame, t
-
-    @property
-    def camera(self):
-        return self.__camera
 
     @property
     def orientation(self):
