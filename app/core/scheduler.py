@@ -1,5 +1,6 @@
 from datetime import datetime
 from threading import Event, Thread
+
 from typing_extensions import Self
 
 from ..schemas.schedule import Schedule
@@ -71,6 +72,24 @@ class Scheduler:
         self.__tasks[id] = ScheduledTask(id, schedule, task)
 
         return id
+
+    def remove_task(self, id: int, stop_task: bool = True):
+        if id not in self.__tasks:
+            raise ValueError(f'Task with id {id} does not exist')
+
+        if stop_task:
+            self.__tasks[id].stop()
+
+        del self.__tasks[id]
+
+    def get_task(self, id: int) -> ScheduledTask:
+        if id not in self.__tasks:
+            raise ValueError(f'Task with id {id} does not exist')
+
+        return self.__tasks[id]
+
+    def get_tasks(self) -> list[ScheduledTask]:
+        return list(self.__tasks.values())
 
     def start(self):
         self.__end_event.clear()
