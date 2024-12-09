@@ -1,6 +1,32 @@
-from pydantic import BaseModel, Field, root_validator
 from datetime import datetime, timedelta
 from typing import Annotated
+
+from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
+
+
+class ScheduleMessage(BaseModel):
+    success: Annotated[
+        bool,
+        Field(
+            description="Success status of the operation",
+            examples=[True, False],
+        ),
+    ]
+    id: Annotated[
+        int | None,
+        Field(
+            description="ID of the schedule",
+            examples=[0, 1, 2, None],
+        ),
+    ]
+    message: Annotated[
+        str,
+        Field(
+            description="Message to be displayed",
+            examples=["Hello, World!"],
+        ),
+    ]
 
 
 class Schedule(BaseModel):
@@ -43,23 +69,23 @@ class SetSchedule(BaseModel):
         ),
     ]
 
-    @root_validator(pre=True)
-    def validate_schedule(cls, values):
-        start_time = values.get("start_time")
-        end_time = values.get("end_time")
-        duration = values.get("duration")
-
-        if end_time is not None and duration is not None:
+    @model_validator(mode="before")
+    def validate_schedule(self) -> Self:
+        if self.end_time is not None and self.duration is not None:
             raise ValueError("Either end_time or duration should be provided, not both.")
-        if end_time is None and duration is None:
+        if self.end_time is None and self.duration is None:
             raise ValueError("Either end_time or duration should be provided.")
 
-        if end_time is not None:
-            values["duration"] = end_time - start_time
-        if duration is not None:
-            values["end_time"] = start_time + duration
+        if self.end_time is not None:
+            self.duration = self.end_time - self.start_time
+        elif self.duration is not None:
+            self.end_time = self.start_time + self.duration
 
-        return values
+        assert self.end_time is not None
+        if self.end_time < self.start_time:
+            raise ValueError("end_time should be greater than start_time.")
+
+        return self
 
     def to_schedule(self) -> Schedule:
         if self.end_time is not None and self.duration is not None:
