@@ -1,12 +1,10 @@
 from multiprocessing import Event, Process
 
+import NDIlib as ndi
 from typing_extensions import Self
 
-from src.camera_system import CameraSystem
-from src.logger import LOG_DIR, logger
-from src.utils import Camera
+from main import logger, ndi_receiver_process, out_path
 
-from ...main import ndi_process, rtsp_process
 from .schedulable import Schedulable
 
 
@@ -31,19 +29,37 @@ class RecordManager(Schedulable):
 
         self._running = True
 
-        self.camera_system = CameraSystem()
+        if not ndi.initialize():
+            logger.error("Failed to initialize NDI.")
+            raise ValueError("Failed to initialize NDI.")
+
+        ndi_find = ndi.find_create_v2()
+        if ndi_find is None:
+            logger.error("Failed to create NDI find instance.")
+            raise ValueError("Failed to create NDI find instance.")
+
+        sources = []
+        while len(sources) < 2:
+            logger.info("Looking for sources ...")
+            ndi.find_wait_for_sources(ndi_find, 5000)
+            sources = ndi.find_get_current_sources(ndi_find)
+            # print(sources[0].ndi_name)
+
+        # for source in sources:
+        #     print(source.ndi_name, source.url_address)
+
+        urls = [source.url_address for source in sources]
+        logger.debug(urls)
+
         self.processes: list[Process] = []
         self.stop_event = Event()
-        for camera in self.camera_system.cameras:
-            if camera != Camera.PANO:
-                p = Process(target=ndi_process, args=(self.camera_system, camera, LOG_DIR, self.stop_event))
-            else:
-                p = Process(
-                    target=rtsp_process,
-                    args=(self.camera_system, camera, self.stop_event, (1920, 1080), './rtdetrv2.onnx'),
-                )
+        logger.info("Started frame processing.")
+        for idx, source in enumerate(sources):
+            p = Process(target=ndi_receiver_process, args=(source, idx, out_path, self.stop_event))
             self.processes.append(p)
             p.start()
+
+        ndi.find_destroy(ndi_find)
 
     def stop(self, *args, **kwargs):
         if not self._running:
