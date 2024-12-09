@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+FROM nvidia/cuda:12.6.2-devel-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG FFMPEG_VERSION=4.1.11
@@ -64,10 +64,10 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 # Copy application code
 WORKDIR /app
 COPY main.py /app/
-COPY requirements/requirements.txt /app/
+COPY requirements/prod.txt /app/
 
 # Install Python dependencies in a virtual environment
 RUN python3 -m venv .venv && \
-    ./.venv/bin/pip install --no-cache-dir -r requirements.txt
+    ./.venv/bin/pip install --no-cache-dir -r prod.txt
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["/bin/bash", "-c", "source /app/.venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
