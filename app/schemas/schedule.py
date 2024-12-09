@@ -28,6 +28,11 @@ class ScheduleMessage(BaseModel):
     ]
 
 
+class BadScheduleMessage(ScheduleMessage):
+    def __init__(self, message: str) -> None:
+        super().__init__(success=False, id=None, message=message)
+
+
 class Schedule(BaseModel):
     start_time: Annotated[
         datetime,

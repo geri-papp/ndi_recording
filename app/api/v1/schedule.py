@@ -1,10 +1,11 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
 from ...core.record_manager import RecordManager
 from ...core.scheduler import Scheduler
-from ...schemas.schedule import Schedule, ScheduleMessage
+from ...schemas.schedule import BadScheduleMessage, Schedule, ScheduleMessage
 from ..dependencies import get_record_manager, get_schedule, get_scheduler
 
 router = APIRouter(prefix="/schedule", tags=["Schedule"])
@@ -19,6 +20,10 @@ def set_schedule(
     try:
         id: int = scheduler.add_task(schedule=schedule, task=record_manager)
     except Exception as e:
-        return ScheduleMessage(success=False, id=None, message=str(e))
+        return BadScheduleMessage(message=str(e))
 
-    return ScheduleMessage(success=True, id=id, message="Task added successfully")
+    return ScheduleMessage(
+        success=True,
+        id=id,
+        message=f"Task scheduled with ID: {id}\nRemaining time until start: {schedule.start_time - datetime.now()}",
+    )
