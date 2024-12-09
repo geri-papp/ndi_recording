@@ -1,4 +1,5 @@
-from multiprocessing import Event, Lock, Process
+from multiprocessing import Event, Process
+from threading import Lock
 
 import NDIlib as ndi
 from typing_extensions import Self
