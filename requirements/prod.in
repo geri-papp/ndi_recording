@@ -4,3 +4,4 @@ tqdm
 onnxruntime-gpu
 opencv-python-headless
 pillow
+fastapi
