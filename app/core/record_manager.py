@@ -1,4 +1,4 @@
-from multiprocessing import Event, Process
+from multiprocessing import Event, Lock, Process
 
 import NDIlib as ndi
 from typing_extensions import Self
@@ -23,8 +23,35 @@ class RecordManager(Schedulable):
             raise ValueError("Cannot instantiate a new instance of this class, use get_instance instead")
 
         self._running = False
+        self.__lock = Lock()
 
     def start(self, *args, **kwargs):
+        with self.__lock:
+            self._start(*args, **kwargs)
+
+    def stop(self, *args, **kwargs):
+        with self.__lock:
+            self._stop(*args, **kwargs)
+
+    @property
+    def is_running(self) -> bool:
+        with self.__lock:
+            return self._running
+
+    def _stop(self, *args, **kwargs):
+        if not self._running:
+            return
+
+        self.stop_event.set()
+        for process in self.processes:
+            if process.is_alive():
+                process.join()
+            else:
+                logger.warning(f"Process {process} not created.")
+
+        self._running = False
+
+    def _start(self, *args, **kwargs):
         if self._running:
             return
 
@@ -62,19 +89,3 @@ class RecordManager(Schedulable):
 
         ndi.find_destroy(ndi_find)
 
-    def stop(self, *args, **kwargs):
-        if not self._running:
-            return
-
-        self.stop_event.set()
-        for process in self.processes:
-            if process.is_alive():
-                process.join()
-            else:
-                logger.warning(f"Process {process} not created.")
-
-        self._running = False
-
-    @property
-    def is_running(self) -> bool:
-        return self._running
