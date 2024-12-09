@@ -105,6 +105,10 @@ def ptz_process(camera: CameraPTZ, path: str, stop_event: Event, codec: str = "h
     ffmpeg_process = subprocess.Popen(
         [
             "ffmpeg",
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
             "-f",
             "rawvideo",
             "-pix_fmt",
@@ -123,10 +127,6 @@ def ptz_process(camera: CameraPTZ, path: str, stop_event: Event, codec: str = "h
             "fast",
             "-profile:v",
             "high",
-            "-hwaccel",
-            "cuda",
-            "-hwaccel_output_format",
-            "cuda",
             os.path.join(path, f"cam{camera.idx}.mp4"),
         ],
         stdin=subprocess.PIPE,
