@@ -5,3 +5,4 @@ onnxruntime-gpu
 opencv-python-headless
 pillow
 fastapi
+uvicorn
