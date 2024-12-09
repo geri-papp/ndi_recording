@@ -64,10 +64,10 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 # Copy application code
 WORKDIR /app
 COPY main.py /app/
-COPY requirements/requirements.txt /app/
+COPY requirements/prod.txt /app/
 
 # Install Python dependencies in a virtual environment
 RUN python3 -m venv .venv && \
-    ./.venv/bin/pip install --no-cache-dir -r requirements.txt
+    ./.venv/bin/pip install --no-cache-dir -r prod.txt
 
 CMD ["/bin/bash", "-c", "source /app/.venv/bin/activate && exec bash"]
