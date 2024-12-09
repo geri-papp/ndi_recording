@@ -10,8 +10,13 @@ router = APIRouter(prefix="/camera", tags=["Camera"])
 
 
 @router.get("/status", response_model=CameraStatus)
-async def get_camera_status():
-    raise NotImplementedError("Getting camera status is not implemented yet.")
+async def get_camera_status(
+    record_manager: Annotated[
+        RecordManager,
+        Depends(get_record_manager),
+    ],
+):
+    return CameraStatus(recording=record_manager.is_running)
 
 
 @router.post("/start")
