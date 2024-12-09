@@ -1,0 +1,10 @@
+services:
+  web:
+    image: ndi_recording
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    volumes:
+      - ./:/code/
