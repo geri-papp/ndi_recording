@@ -9,6 +9,7 @@ from .schedulable import Schedulable
 
 
 class RecordManager(Schedulable):
+    __instance: Self | None = None
     __key = object()
 
     @classmethod
