@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.6.2-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG FFMPEG_VERSION=4.1.11
@@ -10,6 +10,7 @@ RUN apt-get update -qq --fix-missing && \
     apt-get install -y --no-install-recommends \
         git \
         yasm \
+        curl \
         wget \
         avahi-daemon \
         libavahi-client3 \

@@ -7,8 +7,11 @@ from multiprocessing import Process, Event
 import argparse
 from typing import Tuple
 from tqdm import tqdm
-
-# import cv2
+import onnxruntime
+import time
+import cv2
+from typing import List
+from collections import deque, Counter
 
 import time
 from datetime import datetime, timedelta
@@ -42,6 +45,111 @@ def create_logger():
 
 
 logger = create_logger()
+
+
+def process_buckets(boxes, labels, scores, bucket_width):
+    buckets = {0: 0, 1: 0, 2: 0}
+    bboxes_player = boxes[(labels == 2) & (scores > 0.5)]
+    centers_x = (bboxes_player[:, 0] + bboxes_player[:, 2]) / 2
+
+    for center_x in centers_x:
+        bucket_idx = center_x // bucket_width
+        buckets[bucket_idx] += 1
+
+    return max(buckets, key=lambda k: buckets[k])
+
+
+def update_frequency(window, freq_counter, bucket, max_window_size=50):
+    """
+    Update the sliding window and frequency counter to track the most frequent bucket.
+    """
+    window.append(bucket)
+    freq_counter[bucket] += 1
+
+    if len(window) > max_window_size:
+        oldest = window.popleft()
+        freq_counter[oldest] -= 1
+        if freq_counter[oldest] == 0:
+            del freq_counter[oldest]
+
+    # Return the most common bucket
+    return freq_counter.most_common(1)[0][0]
+
+
+def pano_process(
+    url: str,
+    ptz_urls: List,
+    onnx_file: str,
+    stop_event: Event,
+    start_event: Event,
+    fps: int = 15,
+):
+    """ """
+
+    frame_size = np.array([730, 2200])
+    sleep_time = 1 / fps
+    bucket_width = frame_size[1] // 3
+
+    onnx_session = onnxruntime.InferenceSession(onnx_file, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+    logger.info(f"ONNX Model Device: {onnxruntime.get_device()}")
+
+    window = deque()
+    freq_counter = Counter()
+
+    video_capture = cv2.VideoCapture(url)
+
+    start_event.set()
+    try:
+        while not stop_event.is_set():
+            ret, frame = video_capture.read()
+
+            if not ret:
+                logger.warning(f"No panorama frame captured.")
+                continue
+            frame = frame[420:1150, 1190:3390]
+            img = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
+            img = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0)
+
+            labels, boxes, scores = onnx_session.run(
+                output_names=None,
+                input_feed={
+                    'images': img,
+                    "orig_target_sizes": frame_size[::-1],
+                },
+            )
+
+            most_populated_bucket = process_buckets(boxes, labels, scores, bucket_width)
+            mode = update_frequency(window, freq_counter, most_populated_bucket)
+
+            for url in ptz_urls:
+                command = (
+                    rf'szCmd={{'
+                    rf'"SysCtrl":{{'
+                    rf'"PtzCtrl":{{'
+                    rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{mode}'
+                    rf'}}'
+                    rf'}}'
+                    rf'}}'
+                )
+
+                subprocess.run(
+                    [
+                        "curl",
+                        f"http://{url}/ajaxcom",
+                        "--data-raw",
+                        command,
+                    ],
+                    check=False,
+                    capture_output=False,
+                    text=False,
+                )
+
+            time.sleep(sleep_time)
+
+    except KeyboardInterrupt:
+        video_capture.release()
+
+    logger.info(f"RTSP Receiver Process stopped.")
 
 
 class NDIReceiver:
@@ -190,15 +298,25 @@ def main(start_time: datetime, end_time: datetime) -> int:
         sources = ndi.find_get_current_sources(ndi_find)
         print(sources[0].ndi_name)
 
-    for source in sources:
-        print(source.ndi_name, source.url_address)
+    ptz_urls = [source.url_address.split(':')[0] for source in sources]
 
-    urls = [source.url_address for source in sources]
-    logger.debug(urls)
-
-    processes = []
+    start_event = Event()
     stop_event = Event()
-    logger.info(f"Started frame processing.")
+
+    proc_pano = Process(
+        target=pano_process,
+        args=(
+            "rtsp://root:oxittoor@192.168.33.103:554/media2/stream.sdp?profile=Profile200",
+            ptz_urls,
+            './rtdetrv2.onnx',
+            stop_event,
+            start_event,
+        ),
+    )
+    proc_pano.start()
+
+    start_event.wait()
+    processes = []
     for idx, source in enumerate(sources):
         p = Process(target=ndi_receiver_process, args=(source, idx, out_path, stop_event))
         processes.append(p)
@@ -221,6 +339,8 @@ def main(start_time: datetime, end_time: datetime) -> int:
         for process in processes:
             if process.is_alive():
                 process.join()
+
+        proc_pano.kill()
 
     logger.info("Finished recording.")
 
