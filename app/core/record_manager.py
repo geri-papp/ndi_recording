@@ -26,7 +26,7 @@ class RecordManager(Schedulable):
 
     def start(self, *args, **kwargs):
         if self._running:
-            raise ValueError("RecordManager is already running")
+            return
 
         self._running = True
 
@@ -64,7 +64,7 @@ class RecordManager(Schedulable):
 
     def stop(self, *args, **kwargs):
         if not self._running:
-            raise ValueError("RecordManager is not running")
+            return
 
         self.stop_event.set()
         for process in self.processes:
