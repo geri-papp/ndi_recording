@@ -93,7 +93,7 @@ class Scheduler:
 
     def start(self):
         self.__end_event.clear()
-        self.__thread = Thread(target=self.__run)
+        self.__thread = Thread(target=self.__run, daemon=True)
         self.__thread.start()
 
     def stop(self):
