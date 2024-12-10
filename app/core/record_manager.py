@@ -84,9 +84,11 @@ class RecordManager(Schedulable):
         self.stop_event = Event()
         logger.info("Started frame processing.")
         for idx, source in enumerate(sources):
-            p = Process(target=ndi_receiver_process, args=(source, idx, out_path, self.stop_event))
+            p = Process(
+                target=ndi_receiver_process,
+                args=((source.ndi_name, source.url_address), idx, out_path, self.stop_event),
+            )
             self.processes.append(p)
             p.start()
 
         ndi.find_destroy(ndi_find)
-
