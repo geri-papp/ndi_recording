@@ -64,6 +64,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 # Copy application code
 WORKDIR /app
 COPY main.py /app/
+COPY app /app/app
 COPY requirements/prod.txt /app/
 
 # Install Python dependencies in a virtual environment
