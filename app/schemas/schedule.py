@@ -38,7 +38,7 @@ class Schedule(BaseModel):
         datetime,
         Field(
             description="Start time of the schedule",
-            examples=[(datetime.now() + timedelta(hours=1)).isoformat()],
+            examples=[(datetime.now() + timedelta(minutes=15)).isoformat()],
         ),
     ]
     end_time: Annotated[
@@ -55,7 +55,7 @@ class SetSchedule(BaseModel):
         datetime,
         Field(
             description="Start time of the schedule",
-            examples=[(datetime.now() + timedelta(hours=1)).isoformat()],
+            examples=[(datetime.now() + timedelta(minutes=15)).isoformat()],
         ),
     ]
     end_time: Annotated[
