@@ -1,12 +1,19 @@
 services:
   web:
     image: ndi_record
+    runtime: nvidia
     # build:
     #   context: .
     #   dockerfile: Dockerfile
-    # network_mode: "host"
-    ports:
-      - 8000:8000
+    network_mode: host
+    privileged: true
+    # ports:
+    #   - 8000:8000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
     volumes:
       - ./app:/app/app
       - /etc/localtime:/etc/localtime:ro
