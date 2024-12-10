@@ -4,7 +4,7 @@ from threading import Lock
 import NDIlib as ndi
 from typing_extensions import Self
 
-from main import logger, ndi_receiver_process, out_path
+from main import logger, ndi_receiver_process, out_path, pano_process
 
 from .schedulable import Schedulable
 
@@ -77,12 +77,25 @@ class RecordManager(Schedulable):
         # for source in sources:
         #     print(source.ndi_name, source.url_address)
 
-        urls = [source.url_address for source in sources]
-        logger.debug(urls)
+        ptz_urls = [source.url_address.split(':')[0] for source in sources]
 
-        self.processes: list[Process] = []
-        self.stop_event = Event()
-        logger.info("Started frame processing.")
+        start_event = Event()
+        stop_event = Event()
+
+        proc_pano = Process(
+            target=pano_process,
+            args=(
+                "rtsp://root:oxittoor@192.168.33.103:554/media2/stream.sdp?profile=Profile200",
+                ptz_urls,
+                './rtdetrv2.onnx',
+                stop_event,
+                start_event,
+            ),
+        )
+        proc_pano.start()
+
+        start_event.wait()
+        processes = []
         for idx, source in enumerate(sources):
             p = Process(
                 target=ndi_receiver_process,

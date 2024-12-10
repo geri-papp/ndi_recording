@@ -1,10 +1,15 @@
 services:
   web:
-    image: ndi_recording
+    image: ndi_record
     # build:
     #   context: .
     #   dockerfile: Dockerfile
+    # network_mode: "host"
     ports:
       - 8000:8000
     volumes:
       - ./app:/app/app
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /run/avahi-daemon/socket:/run/avahi-daemon/socket
+      - /var/run/dbus:/var/run/dbus
