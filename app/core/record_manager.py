@@ -39,19 +39,6 @@ class RecordManager(Schedulable):
         with self.__lock:
             return self._running
 
-    def _stop(self, *args, **kwargs):
-        if not self._running:
-            return
-
-        self.stop_event.set()
-        for process in self.processes:
-            if process.is_alive():
-                process.join()
-            else:
-                logger.warning(f"Process {process} not created.")
-
-        self._running = False
-
     def _start(self, *args, **kwargs):
         if self._running:
             return
@@ -80,22 +67,22 @@ class RecordManager(Schedulable):
         ptz_urls = [source.url_address.split(':')[0] for source in sources]
 
         start_event = Event()
-        stop_event = Event()
+        self.stop_event = Event()
 
-        proc_pano = Process(
+        self.proc_pano = Process(
             target=pano_process,
             args=(
                 "rtsp://root:oxittoor@192.168.33.103:554/media2/stream.sdp?profile=Profile200",
                 ptz_urls,
                 './rtdetrv2.onnx',
-                stop_event,
+                self.stop_event,
                 start_event,
             ),
         )
-        proc_pano.start()
+        self.proc_pano.start()
 
         start_event.wait()
-        processes = []
+        self.processes = []
         for idx, source in enumerate(sources):
             p = Process(
                 target=ndi_receiver_process,
@@ -105,3 +92,17 @@ class RecordManager(Schedulable):
             p.start()
 
         ndi.find_destroy(ndi_find)
+
+    def _stop(self, *args, **kwargs):
+        if not self._running:
+            return
+
+        self.stop_event.set()
+        for process in self.processes:
+            if process.is_alive():
+                process.join()
+
+        self.proc_pano.kill()
+
+        self._running = False
+
