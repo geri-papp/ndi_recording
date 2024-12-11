@@ -10,7 +10,7 @@ router = APIRouter(prefix="/camera", tags=["Camera"])
 
 
 @router.get("/status", response_model=CameraStatus)
-async def get_camera_status(
+def get_camera_status(
     record_manager: Annotated[
         RecordManager,
         Depends(get_record_manager),
@@ -20,17 +20,17 @@ async def get_camera_status(
 
 
 @router.post("/start")
-async def start_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
+def start_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     record_manager.start()
 
 
 @router.post("/stop")
-async def stop_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
+def stop_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     record_manager.stop()
 
 
 @router.post("/restart")
-async def restart_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
+def restart_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     try:
         record_manager.stop()
     except ValueError:
