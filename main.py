@@ -209,7 +209,7 @@ class NDIReceiver:
                 "-pix_fmt",
                 "yuv420p",
                 "-b:v",
-                "30000k",
+                "35000k",
                 "-preset",
                 "fast",
                 "-profile:v",

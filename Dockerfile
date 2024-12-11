@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+FROM nvidia/cuda:12.6.2-cudnn-devel-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG FFMPEG_VERSION=4.1.11
@@ -65,6 +65,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 WORKDIR /app
 COPY main.py /app/
 COPY requirements/prod.txt /app/
+COPY rtdetrv2.onnx /app/
 
 # Install Python dependencies in a virtual environment
 RUN python3 -m venv .venv && \
