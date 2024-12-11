@@ -22,7 +22,6 @@ def get_tasks(scheduler: Annotated[Scheduler, Depends(get_scheduler)]):
         ScheduledTaskSchema(
             id=task.id,
             schedule=task.schedule,
-            task=str(task.task),
             is_running=task._running,
         )
         for task in scheduler.get_tasks()
@@ -43,7 +42,6 @@ def get_task(
     return ScheduledTaskSchema(
         id=task.id,
         schedule=task.schedule,
-        task=str(task.task),
         is_running=task._running,
     )
 

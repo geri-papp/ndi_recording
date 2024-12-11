@@ -19,12 +19,6 @@ class ScheduledTaskSchema(BaseModel):
             description="Schedule of the task",
         ),
     ]
-    task: Annotated[
-        str,
-        Field(
-            description="Task to be executed",
-        ),
-    ]
     is_running: Annotated[
         bool,
         Field(
