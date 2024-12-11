@@ -16,6 +16,7 @@ from collections import deque, Counter
 import time
 from datetime import datetime, timedelta
 
+
 out_path = f"{os.getcwd()}/output/{datetime.now().strftime('%Y%m%d_%H%M')}"
 os.makedirs(out_path, exist_ok=True)
 
@@ -232,6 +233,7 @@ class NDIReceiver:
 
 def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 50):
 
+    src = ndi.Source(src[0], src[1])
     receiver = NDIReceiver(src, idx, path, codec, fps)
 
     logger.info(f"NDI Receiver {idx} created.")
@@ -313,12 +315,15 @@ def main(start_time: datetime, end_time: datetime) -> int:
             start_event,
         ),
     )
-    proc_pano.start()
 
+    proc_pano.start()
     start_event.wait()
+
     processes = []
     for idx, source in enumerate(sources):
-        p = Process(target=ndi_receiver_process, args=(source, idx, out_path, stop_event))
+        p = Process(
+            target=ndi_receiver_process, args=((source.ndi_name, source.url_address), idx, out_path, stop_event)
+        )
         processes.append(p)
         p.start()
 
@@ -368,8 +373,8 @@ def parse_arguments(args) -> Tuple[datetime]:
             end_time = datetime.strptime(f"{now.year}.{now.month}.{now.day}_{h}:{m}", "%Y.%m.%d_%H:%M")
         else:
             end_time = datetime.strptime(args.start_time, "%Y.%m.%d_%H:%M")
-    elif args.time:
-        duration = datetime.strptime(args.time, "%H:%M").time()
+    elif args.duration:
+        duration = datetime.strptime(args.duration, "%H:%M").time()
         end_time = start_time + timedelta(hours=duration.hour, minutes=duration.minute)
     else:
         duration = datetime.strptime("01:45", "%H:%M").time()
@@ -383,7 +388,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--start_time", type=str, help="Start time in HH:MM format. e.g. (18:00)", required=False)
     parser.add_argument("--end_time", type=str, help="End time in HH:MM format. e.g. (18:00)", required=False)
-    parser.add_argument("--time", type=str, help="Duration in HH:MM format. e.g. (18:00)", required=False)
+    parser.add_argument("--duration", type=str, help="Duration in HH:MM format. e.g. (18:00)", required=False)
 
     args = parse_arguments(parser.parse_args())
 
