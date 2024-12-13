@@ -12,12 +12,44 @@ import time
 import cv2
 from typing import List
 from collections import deque, Counter
+from PIL import Image, ImageDraw
 
 import time
 from datetime import datetime, timedelta
 
 out_path = f"{os.getcwd()}/output/{datetime.now().strftime('%Y%m%d_%H%M')}"
 os.makedirs(out_path, exist_ok=True)
+
+
+# class2color = {1: (255, 0, 0), 2: (0, 255, 0), 3: (255, 255, 0)}
+# class2str = {1: 'Goalkeeper', 2: 'Player', 3: 'Referee'}
+
+
+# def draw(image, labels, boxes, scores, bucket_id, bucket_width, thrh=0.5):
+#     draw = ImageDraw.Draw(image)
+
+#     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+#     draw_overlay = ImageDraw.Draw(overlay)
+
+#     scr = scores
+#     lab = labels[scr > thrh]
+#     box = boxes[scr > thrh]
+
+#     left = bucket_id * bucket_width
+#     right = (bucket_id + 1) * bucket_width
+#     draw_overlay.rectangle([left, 0, right, image.height], fill=(0, 128, 255, 50))
+
+#     for box, label, score in zip(boxes, labels, scores):
+#         if score > thrh:
+#             draw.rectangle(box.tolist(), outline=class2color[label], width=2)
+#             draw.text((box[0], box[1]), text=class2str[label], fill="blue")
+
+#     blended = Image.alpha_composite(image.convert("RGBA"), overlay)
+#     cv2.imwrite("output/test.png", np.array(blended))
+
+
+
+
 
 
 def create_logger():
@@ -86,6 +118,8 @@ def pano_process(
 ):
     """ """
 
+    position = 1
+
     frame_size = np.array([[2200, 730]])
     sleep_time = 1 / fps
     bucket_width = 2200 // 3
@@ -123,30 +157,34 @@ def pano_process(
             most_populated_bucket = process_buckets(boxes, labels, scores, bucket_width)
             mode = update_frequency(window, freq_counter, most_populated_bucket)
 
-            for url in ptz_urls:
-                command = (
-                    rf'szCmd={{'
-                    rf'"SysCtrl":{{'
-                    rf'"PtzCtrl":{{'
-                    rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{mode}'
-                    rf'}}'
-                    rf'}}'
-                    rf'}}'
-                )
+            # draw(Image.fromarray(frame), labels, boxes, scores, mode, bucket_width)
 
-                subprocess.run(
-                    [
-                        "curl",
-                        f"http://{url}/ajaxcom",
-                        "--data-raw",
-                        command,
-                    ],
-                    check=False,
-                    capture_output=False,
-                    text=False,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+            if position != mode:
+                position = mode
+                for url in ptz_urls:
+                    command = (
+                        rf'szCmd={{'
+                        rf'"SysCtrl":{{'
+                        rf'"PtzCtrl":{{'
+                        rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{mode}'
+                        rf'}}'
+                        rf'}}'
+                        rf'}}'
+                    )
+
+                    subprocess.run(
+                        [
+                            "curl",
+                            f"http://{url}/ajaxcom",
+                            "--data-raw",
+                            command,
+                        ],
+                        check=False,
+                        capture_output=False,
+                        text=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
 
             time.sleep(sleep_time)
 
@@ -194,6 +232,9 @@ class NDIReceiver:
         return subprocess.Popen(
             [
                 "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
                 "-f",
                 "rawvideo",
                 "-pix_fmt",
@@ -303,6 +344,29 @@ def main(start_time: datetime, end_time: datetime) -> int:
 
     ptz_urls = [source.url_address.split(':')[0] for source in sources]
     logger.info(ptz_urls)
+
+    for url in ptz_urls:
+        command = (
+            rf'szCmd={{'
+            rf'"SysCtrl":{{'
+            rf'"PtzCtrl":{{'
+            rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{1}'
+            rf'}}'
+            rf'}}'
+            rf'}}'
+        )
+
+        subprocess.run(
+            [
+                "curl",
+                f"http://{url}/ajaxcom",
+                "--data-raw",
+                command,
+            ],
+            check=False,
+            capture_output=False,
+            text=False,
+        )
 
     start_event = Event()
     stop_event = Event()
