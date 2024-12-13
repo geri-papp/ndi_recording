@@ -106,7 +106,8 @@ def pano_process(
 
             if not ret:
                 logger.warning(f"No panorama frame captured.")
-                continue
+                raise KeyboardInterrupt()
+
             frame = frame[420:1150, 1190:3390]
             img = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
             img = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0)
@@ -143,6 +144,8 @@ def pano_process(
                     check=False,
                     capture_output=False,
                     text=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
 
             time.sleep(sleep_time)
