@@ -86,9 +86,9 @@ def pano_process(
 ):
     """ """
 
-    frame_size = np.array([730, 2200])
+    frame_size = np.array([[2200, 730]])
     sleep_time = 1 / fps
-    bucket_width = frame_size[1] // 3
+    bucket_width = 2200 // 3
 
     onnx_session = onnxruntime.InferenceSession(onnx_file, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
     logger.info(f"ONNX Model Device: {onnxruntime.get_device()}")
@@ -99,6 +99,7 @@ def pano_process(
     video_capture = cv2.VideoCapture(url)
 
     start_event.set()
+    logger.info(f"Process Pano - Event Set!")
     try:
         while not stop_event.is_set():
             ret, frame = video_capture.read()
@@ -114,7 +115,7 @@ def pano_process(
                 output_names=None,
                 input_feed={
                     'images': img,
-                    "orig_target_sizes": frame_size[::-1],
+                    "orig_target_sizes": frame_size,
                 },
             )
 
@@ -296,9 +297,9 @@ def main(start_time: datetime, end_time: datetime) -> int:
         logger.info("Looking for sources ...")
         ndi.find_wait_for_sources(ndi_find, 5000)
         sources = ndi.find_get_current_sources(ndi_find)
-        print(sources[0].ndi_name)
 
     ptz_urls = [source.url_address.split(':')[0] for source in sources]
+    logger.info(ptz_urls)
 
     start_event = Event()
     stop_event = Event()
@@ -368,8 +369,8 @@ def parse_arguments(args) -> Tuple[datetime]:
             end_time = datetime.strptime(f"{now.year}.{now.month}.{now.day}_{h}:{m}", "%Y.%m.%d_%H:%M")
         else:
             end_time = datetime.strptime(args.start_time, "%Y.%m.%d_%H:%M")
-    elif args.time:
-        duration = datetime.strptime(args.time, "%H:%M").time()
+    elif args.duration:
+        duration = datetime.strptime(args.duration, "%H:%M").time()
         end_time = start_time + timedelta(hours=duration.hour, minutes=duration.minute)
     else:
         duration = datetime.strptime("01:45", "%H:%M").time()
@@ -383,7 +384,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--start_time", type=str, help="Start time in HH:MM format. e.g. (18:00)", required=False)
     parser.add_argument("--end_time", type=str, help="End time in HH:MM format. e.g. (18:00)", required=False)
-    parser.add_argument("--time", type=str, help="Duration in HH:MM format. e.g. (18:00)", required=False)
+    parser.add_argument("--duration", type=str, help="Duration in HH:MM format. e.g. (18:00)", required=False)
 
     args = parse_arguments(parser.parse_args())
 

@@ -25,7 +25,7 @@ format:
 
 # Build docker image
 build:
-	sudo docker build -t ndi_record .
+	sudo docker build -t ndi_record:`git rev-parse --abbrev-ref HEAD | sed 's/[^a-zA-Z0-9_\-]/_/g'` -t ndi_record:latest .
 
 # Run docker container
 run:
@@ -33,4 +33,4 @@ run:
 	-v /var/run/dbus:/var/run/dbus \
 	-v /run/avahi-daemon/socket:/run/avahi-daemon/socket \
 	-v /home/geri/work/datasets/test/:/app/output/ \
-	ndi_record
+	ndi_record:`git rev-parse --abbrev-ref HEAD | sed 's/[^a-zA-Z0-9_\-]/_/g'`
