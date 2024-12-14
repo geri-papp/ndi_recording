@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
@@ -64,10 +64,20 @@ def set_schedule(
     except Exception as e:
         return BadScheduleMessage(message=str(e))
 
+    remaining_time: timedelta = schedule.start_time - datetime.now(timezone.utc).replace(tzinfo=None)
+    hours, remainder = divmod(remaining_time.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    display_time: str  # In $HH:$MM:$SS format
+    if remaining_time.days > 0:
+        day_str: str = "days" if remaining_time.days > 1 else "day"
+        display_time = f"{remaining_time.days} {day_str}, {hours:02}:{minutes:02}:{seconds:02}"
+    else:
+        display_time = f"{hours:02}:{minutes:02}:{seconds:02}"
+
     return ScheduleMessage(
         success=True,
         id=id,
-        message=f"Remaining time: {schedule.start_time - datetime.now(timezone.utc).replace(tzinfo=None)}",
+        message=f"Remaining time: {display_time}",
     )
 
 
