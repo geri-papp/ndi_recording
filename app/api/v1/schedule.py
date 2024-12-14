@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
@@ -56,7 +56,7 @@ def set_schedule(
     scheduler: Annotated[Scheduler, Depends(get_scheduler)],
     record_manager: Annotated[RecordManager, Depends(get_record_manager)],
 ):
-    if schedule.start_time < datetime.now():
+    if schedule.start_time < datetime.now(timezone.utc).replace(tzinfo=None):
         return BadScheduleMessage(message="Start time cannot be in the past")
 
     try:
@@ -67,7 +67,7 @@ def set_schedule(
     return ScheduleMessage(
         success=True,
         id=id,
-        message=f"Task scheduled with ID: {id}\nRemaining time until start: {schedule.start_time - datetime.now()}",
+        message=f"Remaining time: {schedule.start_time - datetime.now(timezone.utc).replace(tzinfo=None)}",
     )
 
 

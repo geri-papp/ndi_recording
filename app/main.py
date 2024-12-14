@@ -7,9 +7,6 @@ app = FastAPI(
     generate_unique_id_function=custom_generate_unique_id,
     title="OXCAM",
     version="0.1.1",
-    contact={
-        "name": "OX-IT",
-        "email": "viktor.koch@oxit.hu"
-    },
+    contact={"name": "OX-IT", "email": "viktor.koch@oxit.hu"},
 )
 app.include_router(api_router)

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
@@ -38,14 +38,14 @@ class Schedule(BaseModel):
         datetime,
         Field(
             description="Start time of the schedule",
-            examples=[(datetime.now() + timedelta(minutes=15)).isoformat()],
+            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)).isoformat()],
         ),
     ]
     end_time: Annotated[
         datetime,
         Field(
             description="End time of the schedule",
-            examples=[(datetime.now() + timedelta(hours=2)).isoformat()],
+            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)).isoformat()],
         ),
     ]
 
@@ -55,16 +55,17 @@ class SetSchedule(BaseModel):
         datetime,
         Field(
             description="Start time of the schedule",
-            examples=[(datetime.now() + timedelta(minutes=15)).isoformat()],
+            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)).isoformat()],
         ),
     ]
     end_time: Annotated[
-        datetime,# | None,
+        datetime,  # | None,
         Field(
             description="End time of the schedule",
-            examples=[(datetime.now() + timedelta(hours=2)).isoformat()],
+            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)).isoformat()],
         ),
     ]
+
     # duration: Annotated[
     #     timedelta | None,
     #     Field(
