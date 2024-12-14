@@ -85,7 +85,7 @@ def process_buckets(boxes, labels, scores, bucket_width):
     return max(buckets, key=lambda k: buckets[k])
 
 
-def update_frequency(window, freq_counter, bucket, max_window_size=50):
+def update_frequency(window, freq_counter, bucket, max_window_size=10):
     """
     Update the sliding window and frequency counter to track the most frequent bucket.
     """
@@ -189,7 +189,7 @@ def pano_process(
 
 
 class NDIReceiver:
-    def __init__(self, src, idx: int, path, codec="h264_nvenc", fps: int = 50) -> None:
+    def __init__(self, src, idx: int, path, codec="h264_nvenc", fps: int = 30) -> None:
         self.idx = idx
         self.codec = codec
         self.fps = fps
@@ -269,7 +269,7 @@ class NDIReceiver:
         self.ffmpeg_process.wait()
 
 
-def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 50):
+def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 30):
 
     receiver = NDIReceiver(src, idx, path, codec, fps)
 
