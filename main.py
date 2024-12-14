@@ -1,21 +1,19 @@
-import os
-import NDIlib as ndi
-import subprocess
-import logging
-import numpy as np
-from multiprocessing import Process, Event
 import argparse
-from typing import Tuple
-from tqdm import tqdm
-import onnxruntime
+import logging
+import os
+import subprocess
 import time
-import cv2
-from typing import List
-from collections import deque, Counter
-from PIL import Image, ImageDraw
-
-import time
+from collections import Counter, deque
 from datetime import datetime, timedelta
+from multiprocessing import Event, Process
+from typing import List, Tuple
+
+import cv2
+import NDIlib as ndi
+import numpy as np
+import onnxruntime
+from PIL import Image, ImageDraw
+from tqdm import tqdm
 
 out_path = f"{os.getcwd()}/output/{datetime.now().strftime('%Y%m%d_%H%M')}"
 os.makedirs(out_path, exist_ok=True)
@@ -46,10 +44,6 @@ os.makedirs(out_path, exist_ok=True)
 
 #     blended = Image.alpha_composite(image.convert("RGBA"), overlay)
 #     cv2.imwrite("output/test.png", np.array(blended))
-
-
-
-
 
 
 def create_logger():
@@ -254,7 +248,7 @@ class NDIReceiver:
                 "-pix_fmt",
                 "yuv420p",
                 "-b:v",
-                "35000k",
+                "40000k",
                 "-preset",
                 "fast",
                 "-profile:v",
