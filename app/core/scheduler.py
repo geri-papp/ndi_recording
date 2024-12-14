@@ -49,6 +49,7 @@ class Scheduler:
     def get_instance(cls) -> Self:
         if cls.__instance is None:
             cls.__instance = cls(cls.__key)
+            cls.__instance.start()
 
         return cls.__instance
 
@@ -61,6 +62,9 @@ class Scheduler:
         self.__end_event = end_event or Event()
 
         self.__thread: Thread | None = None
+
+    def __del__(self):
+        self.stop()
 
     def add_task(self, schedule: Schedule, task: Schedulable, id: int | None = None) -> int:
         if id is None:
