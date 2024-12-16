@@ -7,6 +7,20 @@ from ..schemas.schedule import Schedule
 from .schedulable import Schedulable
 
 
+class TaskWithSameIdExists(Exception):
+    def __init__(self, message: str, id: int):
+        self.message = message
+        self.id = id
+        super().__init__(self.message)
+
+
+class TaskNotFound(Exception):
+    def __init__(self, message: str, id: int):
+        self.message = message
+        self.id = id
+        super().__init__(self.message)
+
+
 class ScheduledTask:
     def __init__(self, id: int, schedule: Schedule, task: Schedulable):
         self.id = id
@@ -71,7 +85,7 @@ class Scheduler:
             id = max(self.__tasks.keys(), default=-1) + 1
 
         if id in self.__tasks:
-            raise ValueError(f'Task with id {id} already exists')
+            raise TaskWithSameIdExists(f'Task with id {id} already exists', id=id)
 
         self.__tasks[id] = ScheduledTask(id, schedule, task)
 
@@ -79,7 +93,7 @@ class Scheduler:
 
     def remove_task(self, id: int, stop_task: bool = True):
         if id not in self.__tasks:
-            raise ValueError(f'Task with id {id} does not exist')
+            raise TaskNotFound(f'Task with id {id} does not exist', id=id)
 
         if stop_task:
             self.__tasks[id].stop()
@@ -88,7 +102,7 @@ class Scheduler:
 
     def get_task(self, id: int) -> ScheduledTask:
         if id not in self.__tasks:
-            raise ValueError(f'Task with id {id} does not exist')
+            raise TaskNotFound(f'Task with id {id} does not exist', id=id)
 
         return self.__tasks[id]
 

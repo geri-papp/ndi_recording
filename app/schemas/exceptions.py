@@ -26,7 +26,7 @@ class CameraExceptionSchema(BaseModel):
     status_code: Annotated[
         int,
         Field(
-            description="Status code of the exceptiob",
+            description="Status code of the exception",
             examples=[500],
         ),
     ]

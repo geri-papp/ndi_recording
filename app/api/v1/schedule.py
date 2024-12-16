@@ -3,9 +3,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, status
 
+from ...core.exceptions.http_exceptions import (
+    DuplicateScheduleIdException,
+    ScheduleNotFoundException,
+    ScheduledTaskIsInThePastException,
+)
 from ...core.record_manager import RecordManager
-from ...core.scheduler import Scheduler
-from ...schemas.schedule import BadScheduleMessage, Schedule, ScheduleMessage
+from ...core.scheduler import Scheduler, TaskNotFound, TaskWithSameIdExists
+from ...core.utils.remaining_time import get_formatted_remaining_time
+from ...schemas.schedule import (
+    DuplicateScheduleExceptionSchema,
+    Schedule,
+    ScheduleMessage,
+    ScheduleNotFoundExceptionSchema,
+    ScheduleRemovedMessage,
+    ScheduledTaskIsInThePastExceptionSchema,
+)
 from ...schemas.scheduled_task import ScheduledTaskSchema
 from ..dependencies import get_record_manager, get_schedule, get_scheduler
 
@@ -32,24 +45,42 @@ def get_tasks(scheduler: Annotated[Scheduler, Depends(get_scheduler)]):
     "/{id}",
     response_model=ScheduledTaskSchema,
     status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ScheduleNotFoundExceptionSchema
+        }
+    }
 )
 def get_task(
     *,
     id: Annotated[int, Path(description="ID of the task to get")],
     scheduler: Annotated[Scheduler, Depends(get_scheduler)],
 ):
-    task = scheduler.get_task(id)
-    return ScheduledTaskSchema(
-        id=task.id,
-        schedule=task.schedule,
-        is_running=task._running,
-    )
+    try:
+        task = scheduler.get_task(id)
+        return ScheduledTaskSchema(
+            id=task.id,
+            schedule=task.schedule,
+            is_running=task._running,
+        )
+    except TaskNotFound as e:
+        raise ScheduleNotFoundException(id=e.id)
 
 
 @router.post(
     "/",
     response_model=ScheduleMessage,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Error during setting schedule",
+            "model": ScheduledTaskIsInThePastExceptionSchema
+        },
+        status.HTTP_409_CONFLICT: {
+            "description": "Task with same id exists",
+            "model": DuplicateScheduleExceptionSchema
+        },
+    },
 )
 def set_schedule(
     schedule: Annotated[Schedule, Depends(get_schedule)],
@@ -57,34 +88,32 @@ def set_schedule(
     record_manager: Annotated[RecordManager, Depends(get_record_manager)],
 ):
     if schedule.start_time < datetime.now(timezone.utc).replace(tzinfo=None):
-        return BadScheduleMessage(message="Start time cannot be in the past")
+        raise ScheduledTaskIsInThePastException(schedule.start_time)
 
     try:
         id: int = scheduler.add_task(schedule=schedule, task=record_manager)
-    except Exception as e:
-        return BadScheduleMessage(message=str(e))
+        remaining_time: timedelta = schedule.start_time - datetime.now(timezone.utc).replace(tzinfo=None)
+        display_time: str = get_formatted_remaining_time(remaining_time)
 
-    remaining_time: timedelta = schedule.start_time - datetime.now(timezone.utc).replace(tzinfo=None)
-    hours, remainder = divmod(remaining_time.seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    display_time: str  # In $HH:$MM:$SS format
-    if remaining_time.days > 0:
-        day_str: str = "days" if remaining_time.days > 1 else "day"
-        display_time = f"{remaining_time.days} {day_str}, {hours:02}:{minutes:02}:{seconds:02}"
-    else:
-        display_time = f"{hours:02}:{minutes:02}:{seconds:02}"
+        return ScheduleMessage(
+            remaining_time=remaining_time,
+            id=id,
+            message=f"Remaining time: {display_time}",
+        )
+    except TaskWithSameIdExists as e:
+        raise DuplicateScheduleIdException(e.id)
 
-    return ScheduleMessage(
-        success=True,
-        id=id,
-        message=f"Remaining time: {display_time}",
-    )
 
 
 @router.delete(
     "/{id}",
-    response_model=ScheduleMessage,
+    response_model=ScheduleRemovedMessage,
     status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ScheduleNotFoundExceptionSchema
+        }
+    }
 )
 def remove_schedule(
     *,
@@ -99,6 +128,6 @@ def remove_schedule(
 ):
     try:
         scheduler.remove_task(id, stop_task=stop_task)
-    except Exception as e:
-        return BadScheduleMessage(message=str(e))
-    return ScheduleMessage(success=True, id=id, message="Task removed")
+        return ScheduleRemovedMessage(id=id, message="Task removed")
+    except TaskNotFound as e:
+        raise ScheduleNotFoundException(id=e.id)
