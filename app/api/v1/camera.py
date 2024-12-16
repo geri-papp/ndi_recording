@@ -23,7 +23,7 @@ responses: dict[int, dict[str, Any]] = {
     500: {
         "description": "Error during camera start/stop",
         "model": CameraExceptionSchema,
-    }
+    },
 }
 
 
@@ -37,12 +37,7 @@ def get_camera_status(
     return CameraStatus(recording=record_manager.is_running)
 
 
-@router.post(
-    "/start",
-    status_code=status.HTTP_200_OK,
-    response_model=CameraStatus,
-    responses={**responses}
-)
+@router.post("/start", status_code=status.HTTP_200_OK, response_model=CameraStatus, responses={**responses})
 def start_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     status = CameraStatus(recording=True)
 
@@ -55,14 +50,9 @@ def start_camera(record_manager: Annotated[RecordManager, Depends(get_record_man
         raise FailedToStartCameraException(e.message)
 
     return status
-    
 
-@router.post(
-    "/stop",
-    status_code=status.HTTP_200_OK,
-    response_model=CameraStatus,
-    responses={**responses}
-)
+
+@router.post("/stop", status_code=status.HTTP_200_OK, response_model=CameraStatus, responses={**responses})
 def stop_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     status = CameraStatus(recording=False)
 
@@ -77,12 +67,7 @@ def stop_camera(record_manager: Annotated[RecordManager, Depends(get_record_mana
     return status
 
 
-@router.post(
-    "/restart",
-    status_code=status.HTTP_200_OK,
-    response_model=CameraStatus,
-    responses={**responses}
-)
+@router.post("/restart", status_code=status.HTTP_200_OK, response_model=CameraStatus, responses={**responses})
 def restart_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     try:
         record_manager.stop()

@@ -45,11 +45,7 @@ def get_tasks(scheduler: Annotated[Scheduler, Depends(get_scheduler)]):
     "/{id}",
     response_model=ScheduledTaskSchema,
     status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {
-            "model": ScheduleNotFoundExceptionSchema
-        }
-    }
+    responses={status.HTTP_404_NOT_FOUND: {"model": ScheduleNotFoundExceptionSchema}},
 )
 def get_task(
     *,
@@ -74,11 +70,11 @@ def get_task(
     responses={
         status.HTTP_400_BAD_REQUEST: {
             "description": "Error during setting schedule",
-            "model": ScheduledTaskIsInThePastExceptionSchema
+            "model": ScheduledTaskIsInThePastExceptionSchema,
         },
         status.HTTP_409_CONFLICT: {
             "description": "Task with same id exists",
-            "model": DuplicateScheduleExceptionSchema
+            "model": DuplicateScheduleExceptionSchema,
         },
     },
 )
@@ -104,16 +100,11 @@ def set_schedule(
         raise DuplicateScheduleIdException(e.id)
 
 
-
 @router.delete(
     "/{id}",
     response_model=ScheduleRemovedMessage,
     status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {
-            "model": ScheduleNotFoundExceptionSchema
-        }
-    }
+    responses={status.HTTP_404_NOT_FOUND: {"model": ScheduleNotFoundExceptionSchema}},
 )
 def remove_schedule(
     *,

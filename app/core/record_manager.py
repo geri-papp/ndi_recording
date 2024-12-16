@@ -121,4 +121,3 @@ class RecordManager(Schedulable):
         self.proc_pano.kill()
 
         self._running = False
-

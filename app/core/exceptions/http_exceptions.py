@@ -3,7 +3,11 @@ from http import HTTPStatus
 
 from fastapi import HTTPException, status
 
-from ...schemas.schedule import ScheduledTaskIsInThePastDetailSchema, DuplicateScheduleDetailSchema, ScheduleNotFoundDetailSchema
+from ...schemas.schedule import (
+    ScheduledTaskIsInThePastDetailSchema,
+    DuplicateScheduleDetailSchema,
+    ScheduleNotFoundDetailSchema,
+)
 
 
 class CustomException(HTTPException):
@@ -19,10 +23,7 @@ class CustomException(HTTPException):
 
 class FailedToStartCameraException(HTTPException):
     def __init__(self, extra_detail: str | None = None):
-        detail = {
-            "error": "Camera failed to start",
-            "reason": None
-        }
+        detail = {"error": "Camera failed to start", "reason": None}
         if extra_detail is not None:
             detail.update({"reason": extra_detail})
 
@@ -34,10 +35,7 @@ class FailedToStartCameraException(HTTPException):
 
 class FailedToStopCameraException(HTTPException):
     def __init__(self, extra_detail: str | None = None):
-        detail = {
-            "error": "Camera failed to stop",
-            "reason": None
-        }
+        detail = {"error": "Camera failed to stop", "reason": None}
         if extra_detail is not None:
             detail.update({"reason": extra_detail})
 
@@ -52,7 +50,7 @@ class ScheduledTaskIsInThePastException(HTTPException):
         detail = ScheduledTaskIsInThePastDetailSchema(
             error="Start time cannot be in the past",
             scheduled_time=scheduled_time,
-            current_time=datetime.now(timezone.utc).replace(tzinfo=None)
+            current_time=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
         super().__init__(

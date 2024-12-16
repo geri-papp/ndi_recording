@@ -48,60 +48,40 @@ class ScheduleRemovedMessage(BaseModel):
 class ScheduledTaskIsInThePastDetailSchema(BaseModel):
     error: Annotated[
         str,
-        Field(
-            description="The error that occured",
-            examples=["Scheduled task is in the past"]
-        ),
+        Field(description="The error that occured", examples=["Scheduled task is in the past"]),
     ]
     scheduled_time: Annotated[
         datetime,
         Field(
             description="The start time of the scheduled task",
-            examples=[
-                datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
-            ]
+            examples=[datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)],
         ),
     ]
     current_time: Annotated[
         datetime,
-        Field(
-            description="The current time",
-            examples=[datetime.now(timezone.utc).replace(tzinfo=None)]
-        ),
+        Field(description="The current time", examples=[datetime.now(timezone.utc).replace(tzinfo=None)]),
     ]
 
 
 class DuplicateScheduleDetailSchema(BaseModel):
     error: Annotated[
         str,
-        Field(
-            description="The error that occured",
-            examples=["Scheduled task with the same id already exists"]
-        ),
+        Field(description="The error that occured", examples=["Scheduled task with the same id already exists"]),
     ]
     id: Annotated[
         int,
-        Field(
-            description="The id of the task",
-            examples=[0, 1, 2, 3]
-        ),
+        Field(description="The id of the task", examples=[0, 1, 2, 3]),
     ]
 
 
 class ScheduleNotFoundDetailSchema(BaseModel):
     error: Annotated[
         str,
-        Field(
-            description="The error that occured",
-            examples=["Scheduled task with the given id does not exist"]
-        ),
+        Field(description="The error that occured", examples=["Scheduled task with the given id does not exist"]),
     ]
     id: Annotated[
         int,
-        Field(
-            description="The id of the task",
-            examples=[0, 1, 2, 3]
-        ),
+        Field(description="The id of the task", examples=[0, 1, 2, 3]),
     ]
 
 
