@@ -1,12 +1,30 @@
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 
-from ...core.record_manager import RecordManager
+from ...core.exceptions.http_exceptions import (
+    FailedToStartCameraException,
+    FailedToStopCameraException,
+)
+from ...core.record_manager import (
+    FailedToStartRecordingException,
+    FailedToStopRecordingException,
+    RecordManager,
+)
 from ...schemas.camera import CameraStatus
+from ...schemas.exceptions import CameraExceptionSchema
 from ..dependencies import get_record_manager
 
 router = APIRouter(prefix="/camera", tags=["Camera"])
+
+responses: dict[int, dict[str, Any]] = {
+    202: {"model": CameraStatus},
+    500: {
+        "description": "Error during camera start/stop",
+        "model": CameraExceptionSchema,
+    }
+}
 
 
 @router.get("/status", response_model=CameraStatus)
@@ -19,20 +37,59 @@ def get_camera_status(
     return CameraStatus(recording=record_manager.is_running)
 
 
-@router.post("/start")
+@router.post(
+    "/start",
+    status_code=status.HTTP_200_OK,
+    response_model=CameraStatus,
+    responses={**responses}
+)
 def start_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
-    record_manager.start()
+    status = CameraStatus(recording=True)
 
+    if record_manager.is_running:
+        return JSONResponse(status_code=202, content=status.model_dump())
 
-@router.post("/stop")
+    try:
+        record_manager.start()
+    except FailedToStartRecordingException as e:
+        raise FailedToStartCameraException(e.message)
+
+    return status
+    
+
+@router.post(
+    "/stop",
+    status_code=status.HTTP_200_OK,
+    response_model=CameraStatus,
+    responses={**responses}
+)
 def stop_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
-    record_manager.stop()
+    status = CameraStatus(recording=False)
+
+    if not record_manager.is_running:
+        return JSONResponse(status_code=202, content=status.model_dump())
+
+    try:
+        record_manager.stop()
+    except FailedToStopRecordingException as e:
+        raise FailedToStopCameraException(e.message)
+
+    return status
 
 
-@router.post("/restart")
+@router.post(
+    "/restart",
+    status_code=status.HTTP_200_OK,
+    response_model=CameraStatus,
+    responses={**responses}
+)
 def restart_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     try:
         record_manager.stop()
-    except ValueError:
-        pass
-    record_manager.start()
+        record_manager.start()
+    except FailedToStopRecordingException as e:
+        raise FailedToStopCameraException(e.message)
+    except FailedToStartRecordingException as e:
+        raise FailedToStartCameraException(e.message)
+
+    return CameraStatus(recording=True)

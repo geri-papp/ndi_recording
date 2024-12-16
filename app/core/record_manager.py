@@ -9,9 +9,23 @@ from main import logger, ndi_receiver_process, out_path, pano_process
 from .schedulable import Schedulable
 
 
+class FailedToStartRecordingException(Exception):
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)
+
+
+class FailedToStopRecordingException(Exception):
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)
+
+
 class RecordManager(Schedulable):
     __instance: Self | None = None
     __key = object()
+
+    MAX_ATTEMPTS: int = 5
 
     @classmethod
     def get_instance(cls) -> Self:
@@ -47,22 +61,24 @@ class RecordManager(Schedulable):
 
         if not ndi.initialize():
             logger.error("Failed to initialize NDI.")
-            raise ValueError("Failed to initialize NDI.")
+            raise FailedToStartRecordingException("Failed to initialize NDI.")
 
         ndi_find = ndi.find_create_v2()
         if ndi_find is None:
             logger.error("Failed to create NDI find instance.")
-            raise ValueError("Failed to create NDI find instance.")
+            raise FailedToStartRecordingException("Failed to create NDI find instance.")
 
+        attempts: int = 0
         sources = []
-        while len(sources) < 2:
+        while len(sources) < 2 and attempts < self.MAX_ATTEMPTS:
             logger.info("Looking for sources ...")
             ndi.find_wait_for_sources(ndi_find, 5000)
             sources = ndi.find_get_current_sources(ndi_find)
-            # print(sources[0].ndi_name)
+            attempts += 1
 
-        # for source in sources:
-        #     print(source.ndi_name, source.url_address)
+        if len(sources) < 2:
+            self._running = False
+            raise FailedToStartRecordingException(f"Count not find enough sources. Sources found: {len(sources)}")
 
         ptz_urls = [source.url_address.split(':')[0] for source in sources]
 
