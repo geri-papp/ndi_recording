@@ -51,15 +51,15 @@ class ScheduledTaskIsInThePastDetailSchema(BaseModel):
         Field(description="The error that occured", examples=["Scheduled task is in the past"]),
     ]
     scheduled_time: Annotated[
-        datetime,
+        str,
         Field(
             description="The start time of the scheduled task",
-            examples=[datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)],
+            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)).isoformat()],
         ),
     ]
     current_time: Annotated[
-        datetime,
-        Field(description="The current time", examples=[datetime.now(timezone.utc).replace(tzinfo=None)]),
+        str,
+        Field(description="The current time", examples=[datetime.now(timezone.utc).replace(tzinfo=None).isoformat()]),
     ]
 
 

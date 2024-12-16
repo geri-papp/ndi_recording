@@ -49,8 +49,8 @@ class ScheduledTaskIsInThePastException(HTTPException):
     def __init__(self, scheduled_time: datetime):
         detail = ScheduledTaskIsInThePastDetailSchema(
             error="Start time cannot be in the past",
-            scheduled_time=scheduled_time,
-            current_time=datetime.now(timezone.utc).replace(tzinfo=None),
+            scheduled_time=scheduled_time.isoformat(),
+            current_time=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         )
 
         super().__init__(
