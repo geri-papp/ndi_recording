@@ -1,4 +1,5 @@
 from multiprocessing import Event, Process
+import subprocess
 from threading import Lock
 
 import NDIlib as ndi
@@ -81,6 +82,30 @@ class RecordManager(Schedulable):
             raise FailedToStartRecordingException(f"Count not find enough sources. Sources found: {len(sources)}")
 
         ptz_urls = [source.url_address.split(':')[0] for source in sources]
+        logger.info(ptz_urls)
+
+        for url in ptz_urls:
+            command = (
+                rf'szCmd={{'
+                rf'"SysCtrl":{{'
+                rf'"PtzCtrl":{{'
+                rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{1}'
+                rf'}}'
+                rf'}}'
+                rf'}}'
+            )
+
+            subprocess.run(
+                [
+                    "curl",
+                    f"http://{url}/ajaxcom",
+                    "--data-raw",
+                    command,
+                ],
+                check=False,
+                capture_output=False,
+                text=False,
+            )
 
         start_event = Event()
         self.stop_event = Event()
