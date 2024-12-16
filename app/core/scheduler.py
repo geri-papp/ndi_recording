@@ -3,6 +3,8 @@ from threading import Event, Thread
 
 from typing_extensions import Self
 
+from main import logger
+
 from ..schemas.schedule import Schedule
 from .schedulable import Schedulable
 
@@ -123,9 +125,17 @@ class Scheduler:
         while not self.__end_event.is_set():
             for task in self.__tasks.values():
                 if task.is_due_to_start():
-                    task.start()
+                    try:
+                        task.start()
+                    except Exception as e:
+                        logger.error(f"Error occured while starting a task: {e}")
+
                 elif task.is_due_to_stop():
-                    task.stop()
+                    try:
+                        task.stop()
+                    except Exception as e:
+                        logger.error(f"ScheduledTask.stop encountered an error: {e}")
+
 
             self.__end_event.wait(self.__check_interval)
 
