@@ -1,24 +1,50 @@
-import os
-import NDIlib as ndi
-import subprocess
-import logging
-import numpy as np
-from multiprocessing import Process, Event
 import argparse
-from typing import Tuple
-from tqdm import tqdm
-import onnxruntime
+import logging
+import os
+import subprocess
 import time
-import cv2
-from typing import List
-from collections import deque, Counter
-
-import time
+from collections import Counter, deque
 from datetime import datetime, timedelta
+from multiprocessing import Event, Process
+from typing import List, Tuple
+
+import cv2
+import NDIlib as ndi
+import numpy as np
+import onnxruntime
+from PIL import Image, ImageDraw
+from tqdm import tqdm
 
 
 out_path = f"{os.getcwd()}/output/{datetime.now().strftime('%Y%m%d_%H%M')}"
 os.makedirs(out_path, exist_ok=True)
+
+
+# class2color = {1: (255, 0, 0), 2: (0, 255, 0), 3: (255, 255, 0)}
+# class2str = {1: 'Goalkeeper', 2: 'Player', 3: 'Referee'}
+
+
+# def draw(image, labels, boxes, scores, bucket_id, bucket_width, thrh=0.5):
+#     draw = ImageDraw.Draw(image)
+
+#     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+#     draw_overlay = ImageDraw.Draw(overlay)
+
+#     scr = scores
+#     lab = labels[scr > thrh]
+#     box = boxes[scr > thrh]
+
+#     left = bucket_id * bucket_width
+#     right = (bucket_id + 1) * bucket_width
+#     draw_overlay.rectangle([left, 0, right, image.height], fill=(0, 128, 255, 50))
+
+#     for box, label, score in zip(boxes, labels, scores):
+#         if score > thrh:
+#             draw.rectangle(box.tolist(), outline=class2color[label], width=2)
+#             draw.text((box[0], box[1]), text=class2str[label], fill="blue")
+
+#     blended = Image.alpha_composite(image.convert("RGBA"), overlay)
+#     cv2.imwrite("output/test.png", np.array(blended))
 
 
 def create_logger():
@@ -60,7 +86,7 @@ def process_buckets(boxes, labels, scores, bucket_width):
     return max(buckets, key=lambda k: buckets[k])
 
 
-def update_frequency(window, freq_counter, bucket, max_window_size=50):
+def update_frequency(window, freq_counter, bucket, max_window_size=10):
     """
     Update the sliding window and frequency counter to track the most frequent bucket.
     """
@@ -87,9 +113,11 @@ def pano_process(
 ):
     """ """
 
-    frame_size = np.array([730, 2200])
+    position = 1
+
+    frame_size = np.array([[2200, 730]])
     sleep_time = 1 / fps
-    bucket_width = frame_size[1] // 3
+    bucket_width = 2200 // 3
 
     onnx_session = onnxruntime.InferenceSession(onnx_file, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
     logger.info(f"ONNX Model Device: {onnxruntime.get_device()}")
@@ -100,13 +128,15 @@ def pano_process(
     video_capture = cv2.VideoCapture(url)
 
     start_event.set()
+    logger.info(f"Process Pano - Event Set!")
     try:
         while not stop_event.is_set():
             ret, frame = video_capture.read()
 
             if not ret:
                 logger.warning(f"No panorama frame captured.")
-                continue
+                raise KeyboardInterrupt()
+
             frame = frame[420:1150, 1190:3390]
             img = cv2.resize(frame, (640, 640), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
             img = np.expand_dims(np.transpose(img, (2, 0, 1)), axis=0)
@@ -115,35 +145,41 @@ def pano_process(
                 output_names=None,
                 input_feed={
                     'images': img,
-                    "orig_target_sizes": frame_size[::-1],
+                    "orig_target_sizes": frame_size,
                 },
             )
 
             most_populated_bucket = process_buckets(boxes, labels, scores, bucket_width)
             mode = update_frequency(window, freq_counter, most_populated_bucket)
 
-            for url in ptz_urls:
-                command = (
-                    rf'szCmd={{'
-                    rf'"SysCtrl":{{'
-                    rf'"PtzCtrl":{{'
-                    rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{mode}'
-                    rf'}}'
-                    rf'}}'
-                    rf'}}'
-                )
+            # draw(Image.fromarray(frame), labels, boxes, scores, mode, bucket_width)
 
-                subprocess.run(
-                    [
-                        "curl",
-                        f"http://{url}/ajaxcom",
-                        "--data-raw",
-                        command,
-                    ],
-                    check=False,
-                    capture_output=False,
-                    text=False,
-                )
+            if position != mode:
+                position = mode
+                for url in ptz_urls:
+                    command = (
+                        rf'szCmd={{'
+                        rf'"SysCtrl":{{'
+                        rf'"PtzCtrl":{{'
+                        rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{mode}'
+                        rf'}}'
+                        rf'}}'
+                        rf'}}'
+                    )
+
+                    subprocess.run(
+                        [
+                            "curl",
+                            f"http://{url}/ajaxcom",
+                            "--data-raw",
+                            command,
+                        ],
+                        check=False,
+                        capture_output=False,
+                        text=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
 
             time.sleep(sleep_time)
 
@@ -154,7 +190,7 @@ def pano_process(
 
 
 class NDIReceiver:
-    def __init__(self, src, idx: int, path, codec="h264_nvenc", fps: int = 50) -> None:
+    def __init__(self, src, idx: int, path, codec="h264_nvenc", fps: int = 30) -> None:
         self.idx = idx
         self.codec = codec
         self.fps = fps
@@ -191,6 +227,9 @@ class NDIReceiver:
         return subprocess.Popen(
             [
                 "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
                 "-f",
                 "rawvideo",
                 "-pix_fmt",
@@ -210,7 +249,7 @@ class NDIReceiver:
                 "-pix_fmt",
                 "yuv420p",
                 "-b:v",
-                "30000k",
+                "40000k",
                 "-preset",
                 "fast",
                 "-profile:v",
@@ -231,7 +270,7 @@ class NDIReceiver:
         self.ffmpeg_process.wait()
 
 
-def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 50):
+def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 30):
 
     src = ndi.Source(src[0], src[1])
     receiver = NDIReceiver(src, idx, path, codec, fps)
@@ -298,9 +337,32 @@ def main(start_time: datetime, end_time: datetime) -> int:
         logger.info("Looking for sources ...")
         ndi.find_wait_for_sources(ndi_find, 5000)
         sources = ndi.find_get_current_sources(ndi_find)
-        print(sources[0].ndi_name)
 
     ptz_urls = [source.url_address.split(':')[0] for source in sources]
+    logger.info(ptz_urls)
+
+    for url in ptz_urls:
+        command = (
+            rf'szCmd={{'
+            rf'"SysCtrl":{{'
+            rf'"PtzCtrl":{{'
+            rf'"nChanel":0,"szPtzCmd":"preset_call","byValue":{1}'
+            rf'}}'
+            rf'}}'
+            rf'}}'
+        )
+
+        subprocess.run(
+            [
+                "curl",
+                f"http://{url}/ajaxcom",
+                "--data-raw",
+                command,
+            ],
+            check=False,
+            capture_output=False,
+            text=False,
+        )
 
     start_event = Event()
     stop_event = Event()
