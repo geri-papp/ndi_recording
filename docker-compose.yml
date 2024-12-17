@@ -13,7 +13,9 @@ services:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     volumes:
       - ./app:/app/app
       - /etc/localtime:/etc/localtime:ro
