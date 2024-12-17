@@ -1,8 +1,8 @@
-from multiprocessing import Event, Process
 import subprocess
 from threading import Lock
 
 import NDIlib as ndi
+from multiprocess import Event, Process
 from typing_extensions import Self
 
 from main import logger, ndi_receiver_process, out_path, pano_process
