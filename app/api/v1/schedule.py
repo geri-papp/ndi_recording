@@ -83,12 +83,12 @@ def set_schedule(
     scheduler: Annotated[Scheduler, Depends(get_scheduler)],
     record_manager: Annotated[RecordManager, Depends(get_record_manager)],
 ):
-    if schedule.start_time < datetime.now(timezone.utc).replace(tzinfo=None):
+    if schedule.start_time < datetime.now(timezone.utc):
         raise ScheduledTaskIsInThePastException(schedule.start_time)
 
     try:
         id: int = scheduler.add_task(schedule=schedule, task=record_manager)
-        remaining_time: timedelta = schedule.start_time - datetime.now(timezone.utc).replace(tzinfo=None)
+        remaining_time: timedelta = schedule.start_time - datetime.now(timezone.utc)
         display_time: str = get_formatted_remaining_time(remaining_time)
 
         return ScheduleMessage(

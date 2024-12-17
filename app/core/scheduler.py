@@ -51,10 +51,10 @@ class ScheduledTask:
         self._running = False
 
     def is_due_to_start(self):
-        return self.schedule.start_time <= datetime.now(timezone.utc).replace(tzinfo=None) and not self._running
+        return self.schedule.start_time <= datetime.now(timezone.utc) and not self._running
 
     def is_due_to_stop(self):
-        return self.schedule.end_time <= datetime.now(timezone.utc).replace(tzinfo=None) and self._running
+        return self.schedule.end_time <= datetime.now(timezone.utc) and self._running
 
 
 class Scheduler:

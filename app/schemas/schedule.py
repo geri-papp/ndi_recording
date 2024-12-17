@@ -3,6 +3,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
 
+from ..core.utils.timezone import to_utc
+
 
 class ScheduleMessage(BaseModel):
     id: Annotated[
@@ -54,12 +56,12 @@ class ScheduledTaskIsInThePastDetailSchema(BaseModel):
         str,
         Field(
             description="The start time of the scheduled task",
-            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)).isoformat()],
+            examples=[(datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()],
         ),
     ]
     current_time: Annotated[
         str,
-        Field(description="The current time", examples=[datetime.now(timezone.utc).replace(tzinfo=None).isoformat()]),
+        Field(description="The current time", examples=[datetime.now(timezone.utc).isoformat()]),
     ]
 
 
@@ -138,14 +140,14 @@ class Schedule(BaseModel):
         datetime,
         Field(
             description="Start time of the schedule",
-            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)).isoformat()],
+            examples=[(datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()],
         ),
     ]
     end_time: Annotated[
         datetime,
         Field(
             description="End time of the schedule",
-            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)).isoformat()],
+            examples=[(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()],
         ),
     ]
 
@@ -155,14 +157,20 @@ class SetSchedule(BaseModel):
         datetime,
         Field(
             description="Start time of the schedule",
-            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)).isoformat()],
+            examples=[
+                (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+                (datetime.now(timezone.utc).astimezone() + timedelta(minutes=15)).isoformat(),
+            ],
         ),
     ]
     end_time: Annotated[
         datetime,
         Field(
             description="End time of the schedule",
-            examples=[(datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)).isoformat()],
+            examples=[
+                (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+                (datetime.now(timezone.utc).astimezone() + timedelta(hours=2)).isoformat(),
+            ],
         ),
     ]
 
@@ -171,8 +179,8 @@ class SetSchedule(BaseModel):
     def validate_schedule(cls, data: dict) -> dict:
         start_time_str: str = data["start_time"]
         end_time_str: str = data["end_time"]
-        start_time: datetime = datetime.fromisoformat(start_time_str)
-        end_time: datetime = datetime.fromisoformat(end_time_str)
+        start_time: datetime = to_utc(datetime.fromisoformat(start_time_str))
+        end_time: datetime = to_utc(datetime.fromisoformat(end_time_str))
 
         if end_time < start_time:
             raise ValueError("end_time should be greater than start_time.")
