@@ -127,7 +127,7 @@ class RecordManager(Schedulable):
         for idx, source in enumerate(sources):
             p = Process(
                 target=ndi_receiver_process,
-                args=((source.ndi_name, source.url_address), idx, out_path, self.stop_event),
+                args=(source, idx, out_path, self.stop_event),
             )
             self.processes.append(p)
             p.start()

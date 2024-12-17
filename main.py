@@ -271,8 +271,6 @@ class NDIReceiver:
 
 
 def ndi_receiver_process(src, idx: int, path, stop_event: Event, codec: str = "h264_nvenc", fps: int = 30):
-
-    src = ndi.Source(src[0], src[1])
     receiver = NDIReceiver(src, idx, path, codec, fps)
 
     logger.info(f"NDI Receiver {idx} created.")
