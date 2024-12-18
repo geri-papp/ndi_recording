@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from .dir_creator import get_api_dir, get_recording_dir
+from .dir_creator import get_api_dir, get_recording_dir_from_date_str
 
 
 def get_recording_logger(start_time: datetime) -> logging.Logger:
@@ -14,7 +14,7 @@ def get_recording_logger(start_time: datetime) -> logging.Logger:
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
 
-    dir_path = get_recording_dir(date_str)
+    dir_path = get_recording_dir_from_date_str(date_str)
     file_handler = logging.FileHandler(f"{dir_path}/run.log", mode="w")
     file_handler.setLevel(logging.DEBUG)
 
