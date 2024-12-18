@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 from ..core.utils.timezone import to_utc
 
@@ -87,6 +88,17 @@ class ScheduleNotFoundDetailSchema(BaseModel):
     ]
 
 
+class OverlappingScheduleDetailSchema(BaseModel):
+    error: Annotated[
+        str,
+        Field(description="The error that occured", examples=["Scheduled task overlaps with existing task"]),
+    ]
+    existing_task_id: Annotated[
+        int,
+        Field(description="The id of the task that overlaps", examples=[0, 1, 2, 3]),
+    ]
+
+
 class ScheduledTaskIsInThePastExceptionSchema(BaseModel):
     status_code: Annotated[
         int,
@@ -124,11 +136,27 @@ class ScheduleNotFoundExceptionSchema(BaseModel):
         int,
         Field(
             description="Status code of the exception",
-            examples=[400],
+            examples=[404],
         ),
     ]
     detail: Annotated[
         ScheduleNotFoundDetailSchema,
+        Field(
+            description="The details of the error",
+        ),
+    ]
+
+
+class ScheduleOverlapsExceptionSchema(BaseModel):
+    status_code: Annotated[
+        int,
+        Field(
+            description="Status code of the exception",
+            examples=[409],
+        ),
+    ]
+    detail: Annotated[
+        OverlappingScheduleDetailSchema,
         Field(
             description="The details of the error",
         ),
@@ -150,6 +178,14 @@ class Schedule(BaseModel):
             examples=[(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()],
         ),
     ]
+
+    def overlaps(self, other: Self) -> bool:
+        return (
+            self.start_time <= other.start_time
+            and self.end_time >= other.start_time
+            or other.start_time <= self.start_time
+            and other.end_time >= self.start_time
+        )
 
 
 class SetSchedule(BaseModel):

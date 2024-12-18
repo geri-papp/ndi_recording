@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 
 from ...schemas.schedule import (
     DuplicateScheduleDetailSchema,
+    OverlappingScheduleDetailSchema,
     ScheduledTaskIsInThePastDetailSchema,
     ScheduleNotFoundDetailSchema,
 )
@@ -81,5 +82,15 @@ class ScheduleNotFoundException(HTTPException):
 
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=detail.model_dump(),
+        )
+
+
+class OverlappingScheduleException(HTTPException):
+    def __init__(self, message: str, existing_task_id: int):
+        detail = OverlappingScheduleDetailSchema(error=message, existing_task_id=existing_task_id)
+
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
             detail=detail.model_dump(),
         )

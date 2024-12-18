@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, Path, Query, status
 
 from ...core.exceptions.http_exceptions import (
     DuplicateScheduleIdException,
+    OverlappingScheduleException,
     ScheduledTaskIsInThePastException,
     ScheduleNotFoundException,
 )
 from ...core.record_manager import RecordManager
-from ...core.scheduler import Scheduler, TaskNotFound, TaskWithSameIdExists
+from ...core.scheduler import Scheduler, TaskNotFound, TaskOverlapsWithOtherTask, TaskWithSameIdExists
 from ...core.utils.remaining_time import get_formatted_remaining_time
 from ...schemas.schedule import (
     DuplicateScheduleExceptionSchema,
@@ -17,6 +18,7 @@ from ...schemas.schedule import (
     ScheduledTaskIsInThePastExceptionSchema,
     ScheduleMessage,
     ScheduleNotFoundExceptionSchema,
+    ScheduleOverlapsExceptionSchema,
     ScheduleRemovedMessage,
 )
 from ...schemas.scheduled_task import ScheduledTaskSchema
@@ -73,8 +75,8 @@ def get_task(
             "model": ScheduledTaskIsInThePastExceptionSchema,
         },
         status.HTTP_409_CONFLICT: {
-            "description": "Task with same id exists",
-            "model": DuplicateScheduleExceptionSchema,
+            "description": "Task with same id exists or overlaps with existing task",
+            "model": DuplicateScheduleExceptionSchema | ScheduleOverlapsExceptionSchema,
         },
     },
 )
@@ -98,6 +100,8 @@ def set_schedule(
         )
     except TaskWithSameIdExists as e:
         raise DuplicateScheduleIdException(e.id)
+    except TaskOverlapsWithOtherTask as e:
+        raise OverlappingScheduleException(e.message, e.existing_task_id)
 
 
 @router.delete(

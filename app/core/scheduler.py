@@ -22,6 +22,13 @@ class TaskNotFound(Exception):
         super().__init__(self.message)
 
 
+class TaskOverlapsWithOtherTask(Exception):
+    def __init__(self, message: str, existing_task_id: int):
+        self.message = message
+        self.existing_task_id = existing_task_id
+        super().__init__(self.message)
+
+
 class ScheduledTask:
     def __init__(self, id: int, schedule: Schedule, task: Schedulable):
         self.id = id
@@ -89,6 +96,12 @@ class Scheduler:
 
         if id in self.__tasks:
             raise TaskWithSameIdExists(f'Task with id {id} already exists', id=id)
+
+        for existing_task in self.__tasks.values():
+            if existing_task.schedule.overlaps(schedule):
+                raise TaskOverlapsWithOtherTask(
+                    f"Task overlaps with other task with id: {existing_task.id}", existing_task.id
+                )
 
         self.__tasks[id] = ScheduledTask(id, schedule, task)
 
