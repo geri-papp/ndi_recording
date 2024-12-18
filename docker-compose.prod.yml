@@ -14,4 +14,6 @@ services:
     volumes:
       - /run/avahi-daemon/socket:/run/avahi-daemon/socket
       - /var/run/dbus:/var/run/dbus
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - /home/bvsc-oxit/app/recording:/app/output/

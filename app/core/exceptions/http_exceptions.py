@@ -4,8 +4,8 @@ from http import HTTPStatus
 from fastapi import HTTPException, status
 
 from ...schemas.schedule import (
-    ScheduledTaskIsInThePastDetailSchema,
     DuplicateScheduleDetailSchema,
+    ScheduledTaskIsInThePastDetailSchema,
     ScheduleNotFoundDetailSchema,
 )
 

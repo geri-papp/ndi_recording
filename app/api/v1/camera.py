@@ -1,17 +1,11 @@
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
-from ...core.exceptions.http_exceptions import (
-    FailedToStartCameraException,
-    FailedToStopCameraException,
-)
-from ...core.record_manager import (
-    FailedToStartRecordingException,
-    FailedToStopRecordingException,
-    RecordManager,
-)
+from ...core.exceptions.http_exceptions import FailedToStartCameraException, FailedToStopCameraException
+from ...core.record_manager import FailedToStartRecordingException, FailedToStopRecordingException, RecordManager
 from ...schemas.camera import CameraStatus
 from ...schemas.exceptions import CameraExceptionSchema
 from ..dependencies import get_record_manager
@@ -45,7 +39,7 @@ def start_camera(record_manager: Annotated[RecordManager, Depends(get_record_man
         return JSONResponse(status_code=202, content=status.model_dump())
 
     try:
-        record_manager.start()
+        record_manager.start(datetime.now())
     except FailedToStartRecordingException as e:
         raise FailedToStartCameraException(e.message)
 
@@ -71,7 +65,7 @@ def stop_camera(record_manager: Annotated[RecordManager, Depends(get_record_mana
 def restart_camera(record_manager: Annotated[RecordManager, Depends(get_record_manager)]):
     try:
         record_manager.stop()
-        record_manager.start()
+        record_manager.start(datetime.now())
     except FailedToStopRecordingException as e:
         raise FailedToStopCameraException(e.message)
     except FailedToStartRecordingException as e:

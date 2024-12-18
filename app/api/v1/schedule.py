@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, Path, Query, status
 
 from ...core.exceptions.http_exceptions import (
     DuplicateScheduleIdException,
-    ScheduleNotFoundException,
     ScheduledTaskIsInThePastException,
+    ScheduleNotFoundException,
 )
 from ...core.record_manager import RecordManager
 from ...core.scheduler import Scheduler, TaskNotFound, TaskWithSameIdExists
@@ -14,10 +14,10 @@ from ...core.utils.remaining_time import get_formatted_remaining_time
 from ...schemas.schedule import (
     DuplicateScheduleExceptionSchema,
     Schedule,
+    ScheduledTaskIsInThePastExceptionSchema,
     ScheduleMessage,
     ScheduleNotFoundExceptionSchema,
     ScheduleRemovedMessage,
-    ScheduledTaskIsInThePastExceptionSchema,
 )
 from ...schemas.scheduled_task import ScheduledTaskSchema
 from ..dependencies import get_record_manager, get_schedule, get_scheduler

@@ -1,9 +1,8 @@
+import logging
 from datetime import datetime, timezone
 from threading import Event, Thread
 
 from typing_extensions import Self
-
-from main import logger
 
 from ..schemas.schedule import Schedule
 from .schedulable import Schedulable
@@ -62,16 +61,18 @@ class Scheduler:
     __key = object()
 
     @classmethod
-    def get_instance(cls) -> Self:
+    def get_instance(cls, logger: logging.Logger) -> Self:
         if cls.__instance is None:
-            cls.__instance = cls(cls.__key)
+            cls.__instance = cls(cls.__key, logger)
             cls.__instance.start()
 
         return cls.__instance
 
-    def __init__(self, key, check_interval: int = 1, end_event: Event | None = None):
+    def __init__(self, key, logger: logging.Logger, check_interval: int = 1, end_event: Event | None = None):
         if key is not self.__key:
             raise ValueError("Cannot instantiate a new instance of this class, use get_instance instead")
+
+        self.__logger = logger
 
         self.__tasks: dict[int, ScheduledTask] = {}
         self.__check_interval = check_interval
@@ -126,16 +127,15 @@ class Scheduler:
             for task in self.__tasks.values():
                 if task.is_due_to_start():
                     try:
-                        task.start()
+                        task.start(task.schedule.start_time)
                     except Exception as e:
-                        logger.error(f"Error occured while starting a task: {e}")
+                        self.__logger.error(f"Error occured while starting a task: {e}")
 
                 elif task.is_due_to_stop():
                     try:
                         task.stop()
                     except Exception as e:
-                        logger.error(f"ScheduledTask.stop encountered an error: {e}")
-
+                        self.__logger.error(f"ScheduledTask.stop encountered an error: {e}")
 
             self.__end_event.wait(self.__check_interval)
 

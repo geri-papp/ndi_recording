@@ -1,13 +1,17 @@
+import logging
 import subprocess
+from datetime import datetime
 from threading import Lock
 
 import NDIlib as ndi
 from multiprocess import Event, Process
 from typing_extensions import Self
 
-from main import logger, ndi_receiver_process, out_path, pano_process
+from main import ndi_receiver_process, pano_process
 
 from .schedulable import Schedulable
+from .utils.dir_creator import get_recording_dir_from_datetime
+from .utils.logger import get_recording_logger
 
 
 class FailedToStartRecordingException(Exception):
@@ -29,36 +33,45 @@ class RecordManager(Schedulable):
     MAX_ATTEMPTS: int = 5
 
     @classmethod
-    def get_instance(cls) -> Self:
+    def get_instance(cls, logger: logging.Logger) -> Self:
         if cls.__instance is None:
-            cls.__instance = cls(cls.__key)
+            cls.__instance = cls(cls.__key, logger)
         return cls.__instance
 
-    def __init__(self, key):
+    def __init__(self, key, logger):
         if key is not self.__key:
             raise ValueError("Cannot instantiate a new instance of this class, use get_instance instead")
+
+        self.__logger = logger
 
         self._running = False
         self.__lock = Lock()
 
     def start(self, *args, **kwargs):
         with self.__lock:
+            self.__logger.debug("Starting recording...")
             self._start(*args, **kwargs)
+            self.__logger.debug("Recording started")
 
     def stop(self, *args, **kwargs):
         with self.__lock:
+            self.__logger.debug("Stopping recording...")
             self._stop(*args, **kwargs)
+            self.__logger.debug("Recording stopped")
 
     @property
     def is_running(self) -> bool:
         with self.__lock:
             return self._running
 
-    def _start(self, *args, **kwargs):
+    def _start(self, start_time: datetime, *args, **kwargs):
         if self._running:
             return
 
         self._running = True
+
+        recording_dir = get_recording_dir_from_datetime(start_time)
+        logger = get_recording_logger(start_time)
 
         if not ndi.initialize():
             logger.error("Failed to initialize NDI.")
@@ -118,6 +131,7 @@ class RecordManager(Schedulable):
                 './rtdetrv2.onnx',
                 self.stop_event,
                 start_event,
+                logger,
             ),
         )
         self.proc_pano.start()
@@ -127,7 +141,7 @@ class RecordManager(Schedulable):
         for idx, source in enumerate(sources):
             p = Process(
                 target=ndi_receiver_process,
-                args=(source, idx, out_path, self.stop_event),
+                args=(source, idx, recording_dir, logger, self.stop_event),
             )
             self.processes.append(p)
             p.start()
