@@ -34,3 +34,44 @@ sympy==1.13.3
     # via onnxruntime-gpu
 tqdm==4.67.1
     # via -r requirements/prod.in
+annotated-types==0.7.0
+    # via pydantic
+anyio==4.7.0
+    # via starlette
+click==8.1.7
+    # via uvicorn
+colorama==0.4.6
+    # via
+    #   click
+    #   tqdm
+exceptiongroup==1.2.2
+    # via anyio
+fastapi==0.115.6
+    # via -r requirements\prod.in
+h11==0.14.0
+    # via uvicorn
+idna==3.10
+    # via anyio
+pydantic==2.10.3
+    # via fastapi
+pydantic-core==2.27.1
+    # via pydantic
+pyreadline3==3.5.4
+    # via humanfriendly
+sniffio==1.3.1
+    # via anyio
+starlette==0.41.3
+    # via fastapi
+typing-extensions==4.12.2
+    # via
+    #   anyio
+    #   fastapi
+    #   pydantic
+    #   pydantic-core
+    #   uvicorn
+uvicorn==0.32.1
+    # via -r requirements\prod.in
+multiprocess==0.70.17
+    # Added by hand by Viktor
+dill==0.3.9
+    # Used by multiprocess
