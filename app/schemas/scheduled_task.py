@@ -26,3 +26,10 @@ class ScheduledTaskSchema(BaseModel):
             examples=[True, False],
         ),
     ]
+    is_force_stopped: Annotated[
+        bool,
+        Field(
+            description="Whether the task was forcefully stopped",
+            examples=[False, True],
+        ),
+    ]

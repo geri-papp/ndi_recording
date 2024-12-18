@@ -35,6 +35,7 @@ class ScheduledTask:
         self.schedule = schedule
         self.task = task
         self._running = False
+        self._force_stopped = False
 
     def __str__(self):
         return f'ScheduledTask(id={self.id}, schedule={self.schedule}, task={self.task})'
@@ -56,14 +57,21 @@ class ScheduledTask:
         self.task.stop()
         self._running = False
 
+    def force_stop(self):
+        self._force_stopped = True
+        self.stop()
+
     def is_running(self) -> bool:
         return self._running
 
+    def is_force_stopped(self) -> bool:
+        return self._force_stopped
+
     def is_due_to_start(self):
-        return self.schedule.start_time <= datetime.now(timezone.utc) and not self._running
+        return self.schedule.start_time <= datetime.now(timezone.utc) and not self._running and not self._force_stopped
 
     def is_due_to_stop(self):
-        return self.schedule.end_time <= datetime.now(timezone.utc) and self._running
+        return self.schedule.end_time <= datetime.now(timezone.utc) and self._running and not self._force_stopped
 
 
 class Scheduler:
@@ -141,7 +149,7 @@ class Scheduler:
     def stop_running_task(self) -> bool:
         for task in self.__tasks.values():
             if task.is_running():
-                task.stop()
+                task.force_stop()
                 return True
         return False
 

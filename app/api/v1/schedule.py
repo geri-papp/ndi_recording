@@ -37,7 +37,8 @@ def get_tasks(scheduler: Annotated[Scheduler, Depends(get_scheduler)]):
         ScheduledTaskSchema(
             id=task.id,
             schedule=task.schedule,
-            is_running=task._running,
+            is_running=task.is_running(),
+            is_force_stopped=task.is_force_stopped(),
         )
         for task in scheduler.get_tasks()
     ]
@@ -59,7 +60,8 @@ def get_task(
         return ScheduledTaskSchema(
             id=task.id,
             schedule=task.schedule,
-            is_running=task._running,
+            is_running=task.is_running(),
+            is_force_stopped=task.is_force_stopped(),
         )
     except TaskNotFound as e:
         raise ScheduleNotFoundException(id=e.id)
