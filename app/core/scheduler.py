@@ -56,6 +56,9 @@ class ScheduledTask:
         self.task.stop()
         self._running = False
 
+    def is_running(self) -> bool:
+        return self._running
+
     def is_due_to_start(self):
         return self.schedule.start_time <= datetime.now(timezone.utc) and not self._running
 
@@ -134,6 +137,13 @@ class Scheduler:
         self.__end_event.set()
         if self.__thread is not None and self.__thread.is_alive():
             self.__thread.join()
+
+    def stop_running_task(self) -> bool:
+        for task in self.__tasks.values():
+            if task.is_running():
+                task.stop()
+                return True
+        return False
 
     def __run(self):
         while not self.__end_event.is_set():
