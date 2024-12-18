@@ -42,12 +42,12 @@ class ScheduledTask:
     def __repr__(self):
         return str(self)
 
-    def start(self):
+    def start(self, *args, **kwargs):
         if self._running:
             return
 
         self._running = True
-        self.task.start()
+        self.task.start(*args, **kwargs)
 
     def stop(self):
         if not self._running:
